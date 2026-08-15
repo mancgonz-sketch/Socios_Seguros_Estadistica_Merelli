@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cartera y Cobranzas — ACA Nacional</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --navy: #0d2c4e; --navy-light: #16416f; --navy-pale: #eef2f6;
+    --gold: #d4a017; --green: #008300; --green-bg: rgba(0,131,0,0.12);
+    --yellow-bg: rgba(212,160,23,0.16); --red: #c0362f; --red-bg: rgba(192,54,47,0.14);
+    --ink: #1c2530; --muted: #5b6b7c; --line: #dde3e9; --paper: #f7f9fb;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--paper); color: var(--ink); }
+  header { background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%); color: white; padding: 26px 24px 0; }
+  header .eyebrow { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); font-weight: 700; margin-bottom: 6px; }
+  header h1 { margin: 0 0 6px; font-size: clamp(20px,4vw,26px); font-weight: 700; letter-spacing: -.01em; }
+  header p { margin: 0 0 18px; font-size: 13px; color: rgba(255,255,255,.75); max-width: 680px; line-height: 1.5; }
+
+  .tabs { display: flex; gap: 4px; padding: 0 24px; }
+  .tab { padding: 10px 18px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.65); cursor: pointer; border-radius: 8px 8px 0 0; user-select: none; }
+  .tab.active { background: var(--paper); color: var(--navy); }
+  .tab:not(.active):hover { color: white; }
+
+  main { max-width: 1020px; margin: 0 auto; padding: 22px 16px 60px; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .mode-toggle { display: flex; gap: 6px; margin-bottom: 16px; background: white; border: 1px solid var(--line); border-radius: 10px; padding: 4px; width: fit-content; }
+  .mode-btn { padding: 7px 16px; font-size: 12.5px; font-weight: 700; border-radius: 7px; cursor: pointer; color: var(--muted); }
+  .mode-btn.active { background: var(--navy); color: white; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; align-items: center; }
+  .divchip { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: white; font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer; }
+  .divchip.active { background: var(--navy); color: white; border-color: var(--navy); }
+  select.picker { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: white; font-size: 12.5px; font-weight: 600; color: var(--ink); min-width: 180px; }
+
+  .card { background: white; border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  .card h3 { margin: 0 0 4px; font-size: 15px; color: var(--navy); }
+  .card .sub { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+  .card .note { font-size: 11px; color: #96a1ac; margin-top: 10px; line-height: 1.5; }
+
+  .kpis { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 16px; }
+  .kpi { background: white; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .kpi .lbl { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .kpi .val { font-size: 19px; font-weight: 700; color: var(--navy); }
+  .kpi .delta { font-size: 11.5px; font-weight: 600; margin-left: 4px; }
+  .up { color: var(--green); } .down { color: var(--red); }
+
+  .chartbox { position: relative; height: 280px; margin-bottom: 6px; }
+
+  .upload-card { background: white; border: 2px dashed var(--line); border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+  .upload-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+  .upload-slot { flex: 1 1 220px; }
+  .upload-slot label { display: block; font-size: 12px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+  .upload-slot .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .upload-slot input[type=file] { width: 100%; font-size: 12px; }
+  .upload-status { margin-top: 10px; font-size: 12px; font-weight: 600; }
+  .upload-status.ok { color: var(--green); }
+  .upload-status.err { color: var(--red); }
+  .btn-reset { font-size: 11.5px; color: var(--muted); background: none; border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  .btn-reset:hover { background: var(--navy-pale); }
+
+  table.comp { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.comp th { text-align: center; padding: 8px 6px; background: var(--navy-pale); color: var(--navy); font-weight: 700; font-size: 10.5px; text-transform: uppercase; }
+  table.comp th:first-child { text-align: left; padding-left: 12px; }
+  table.comp td { text-align: center; padding: 7px 6px; border-bottom: 1px solid var(--line); }
+  table.comp td:first-child { text-align: left; font-weight: 600; padding-left: 12px; }
+  table.comp tr.hl td { font-weight: 700; border-top: 2px solid var(--line); }
+
+  .acc-card { background: white; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .acc-card.open { box-shadow: 0 4px 18px rgba(13,44,78,.08); }
+  .acc-header { display: flex; align-items: center; gap: 14px; padding: 16px 18px; cursor: pointer; }
+  .acc-header:hover { background: var(--navy-pale); }
+  .chevron { width: 18px; height: 18px; flex-shrink: 0; transition: transform .2s ease; color: var(--navy); }
+  .acc-card.open .chevron { transform: rotate(90deg); }
+  .acc-title { flex: 1; min-width: 0; }
+  .acc-title .name { font-size: 16px; font-weight: 700; color: var(--navy); }
+  .acc-title .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .avg-badge { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; min-width: 62px; padding: 6px 10px; border-radius: 8px; font-weight: 700; }
+  .avg-badge .num { font-size: 17px; line-height: 1; }
+  .avg-badge .lbl2 { font-size: 9px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; opacity: .8; margin-top: 2px; }
+  .sev-3 { background: var(--red-bg); color: var(--red); }
+  .sev-2 { background: var(--yellow-bg); color: #8a6a10; }
+  .sev-1 { background: var(--green-bg); color: var(--green); }
+  .acc-body { max-height: 0; overflow: hidden; transition: max-height .25s ease; }
+  .acc-card.open .acc-body { max-height: 3000px; border-top: 1px solid var(--line); }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  thead th { text-align: center; padding: 8px 6px; background: var(--navy-pale); color: var(--navy); font-weight: 700; font-size: 10.5px; text-transform: uppercase; }
+  thead th:first-child { text-align: left; padding-left: 16px; }
+  tbody td { text-align: center; padding: 7px 6px; border-bottom: 1px solid var(--line); }
+  tbody td:first-child { text-align: left; font-weight: 600; padding-left: 16px; }
+  .cell { display: inline-block; min-width: 48px; padding: 3px 6px; border-radius: 5px; font-weight: 700; font-size: 11.5px; }
+  .g { background: var(--green-bg); color: var(--green); }
+  .y { background: var(--yellow-bg); color: #8a6a10; }
+  .r { background: var(--red-bg); color: var(--red); }
+  .red-count { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; border-radius: 50%; color: white; font-weight: 700; font-size: 11.5px; }
+  tbody tr.office-row { cursor: pointer; }
+  tbody tr.office-row:hover { background: var(--navy-pale); }
+  tbody tr.office-row td:first-child::before { content: '▸ '; color: #b7c1cb; font-size: 10px; }
+  tbody tr.office-row.expanded td:first-child::before { content: '▾ '; color: var(--navy); }
+  tr.detail-row td { padding: 0 !important; border-bottom: 1px solid var(--line); }
+  .detail-wrap { padding: 12px 16px 16px; background: #fbfcfd; }
+  .detail-chartbox { position: relative; height: 160px; }
+  .detail-empty { font-size: 11.5px; color: var(--muted); padding: 6px 0; }
+
+  .legend-row { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: middle; }
+  .section-title { font-size: 13px; font-weight: 700; color: var(--navy); text-transform: uppercase; letter-spacing: .04em; margin: 26px 0 10px; }
+  footer { max-width: 1020px; margin: 0 auto; padding: 0 16px 40px; font-size: 11px; color: #96a1ac; line-height: 1.6; }
+
+  #lockScreen { position: fixed; inset: 0; background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%); display: flex; align-items: center; justify-content: center; z-index: 999; padding: 20px; }
+  #lockScreen .lock-card { background: white; border-radius: 14px; padding: 32px 28px; max-width: 340px; width: 100%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+  #lockScreen .lock-icon { font-size: 32px; margin-bottom: 10px; }
+  #lockScreen h2 { margin: 0 0 6px; font-size: 17px; color: var(--navy); }
+  #lockScreen p { margin: 0 0 18px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  #lockScreen input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); font-size: 14px; text-align: center; letter-spacing: 0.05em; margin-bottom: 10px; box-sizing: border-box; }
+  #lockScreen button { width: 100%; padding: 10px; border-radius: 8px; border: none; background: var(--navy); color: white; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+  #lockScreen button:hover { background: var(--navy-light); }
+  #lockScreen .lock-error { color: var(--red); font-size: 12px; margin-top: 8px; min-height: 16px; }
+  body.locked { overflow: hidden; }
+  body.locked > *:not(#lockScreen) { display: none !important; }
+</style>
+</head>
+<body class="locked">
+
+<div id="lockScreen">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <h2>Cartera y Cobranzas — ACA</h2>
+    <p>Ingresá el código de acceso que te compartió tu Gerencia Divisional.</p>
+    <input type="password" id="lockInput" placeholder="Código de acceso" autocomplete="off">
+    <button id="lockBtn">Entrar</button>
+    <div class="lock-error" id="lockError"></div>
+  </div>
+</div>
+
+<header>
+  <div class="eyebrow">ACA · Producción de Socios y Seguros</div>
+  <h1 id="pageTitle">Cartera y Cobranzas — Nacional</h1>
+  <p>Evolución de cartera de socios, enero 2025 a junio 2026, por gerencia divisional u oficina individual — más la situación actual de débito, mora y seguro.</p>
+  <div class="tabs">
+    <div class="tab active" data-tab="cartera">Evolución de Cartera</div>
+    <div class="tab" data-tab="cobranzas">Situación de Cobranzas</div>
+    <div class="tab" data-tab="carga">Cargar Archivo</div>
+  </div>
+</header>
+
+<main>
+  <div class="panel active" id="panel-cartera">
+
+    <div class="mode-toggle">
+      <div class="mode-btn active" data-mode="gerencia">Por Gerencia</div>
+      <div class="mode-btn" data-mode="oficina">Por Oficina</div>
+    </div>
+
+    <div class="toolbar" id="divChips"></div>
+
+    <div class="toolbar" id="officePickerRow" style="display:none;">
+      <select class="picker" id="pickerGerencia"></select>
+      <select class="picker" id="pickerOficina"></select>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="card">
+      <h3>Cartera de Socios (cantidad)</h3>
+      <div class="sub">Enero 2025 — Junio 2026</div>
+      <div class="chartbox"><canvas id="chartCartera"></canvas></div>
+      <div class="note">La cartera antes de agosto 2025 se calcula sobre cartera cotizante y desde agosto sobre cartera total (incluye vitalicios) — puede verse un pequeño salto en ese punto por el cambio de definición de origen, no por una variación real.</div>
+    </div>
+
+    <div class="card">
+      <h3>% Débito Automático y % Mora +3 meses</h3>
+      <div class="sub">Enero 2025 — Junio 2026</div>
+      <div class="chartbox"><canvas id="chartDaMora"></canvas></div>
+    </div>
+
+    <div class="card">
+      <h3>% Socios con Seguro</h3>
+      <div class="sub">Enero 2025 — Junio 2026</div>
+      <div class="chartbox"><canvas id="chartSeguro"></canvas></div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-cobranzas">
+
+    <div class="toolbar">
+      <label style="font-size:12.5px;font-weight:700;color:var(--navy);">Ver:</label>
+      <select class="picker" id="pickerGerenciaCobranzas">
+        <option value="TODAS">Todas las gerencias</option>
+      </select>
+      <span id="shareHint" style="font-size:11.5px;color:var(--muted);">Elegí tu gerencia para ver y compartir solo tus oficinas.</span>
+    </div>
+
+    <div class="section-title">Comparativa Nacional — Gerencias Divisionales</div>
+    <div id="comparativaApp"></div>
+
+    <div class="section-title">Situación de Oficinas por Gerencia</div>
+    <div class="legend-row">
+      <span><span class="dot" style="background:#008300;"></span>Bien</span>
+      <span><span class="dot" style="background:#d4a017;"></span>Atención</span>
+      <span><span class="dot" style="background:#c0362f;"></span>Mal</span>
+      <span style="margin-left:auto;">Débito · Mora · ΔMora (vs mes ant.) · Seguro</span>
+    </div>
+    <div id="cobranzasApp"></div>
+  </div>
+
+  <div class="panel" id="panel-carga">
+    <div class="card" style="background:var(--navy-pale);border-color:var(--navy);">
+      <h3 style="margin-bottom:8px;">¿Primera vez usando esto?</h3>
+      <div class="note" style="font-size:12px;">Si tu planilla de Google Sheets todavía está vacía, usá el archivo separado <b>"importador_historico.html"</b> una sola vez para cargar los 18 meses de historia de golpe. Después, cada mes nuevo lo subís acá abajo.</div>
+    </div>
+    <div class="upload-card">
+      <div class="upload-row">
+        <div class="upload-slot">
+          <label>📅 Archivo del mes actual (obligatorio)</label>
+          <input type="file" id="fileCurrent" accept=".xlsx,.xls">
+          <div class="hint">El archivo país mensual (mismo formato que "Detalle de Cartera por Filial"). Actualiza la pestaña "Situación de Cobranzas".</div>
+        </div>
+        <div class="upload-slot">
+          <label>📅 Archivo del mes anterior (opcional)</label>
+          <input type="file" id="filePrev" accept=".xlsx,.xls">
+          <div class="hint">Si lo subís, calcula la variación de mora mes a mes. Si no, esa columna queda en blanco.</div>
+        </div>
+        <button class="btn-reset" id="btnReset">🔄 Recargar desde Google Sheets</button>
+        <button class="btn-reset" id="btnSample" style="background:var(--navy-pale);color:var(--navy);border-color:var(--navy);">🧪 Cargar datos de muestra (ficticios)</button>
+      </div>
+      <div class="upload-status" id="uploadStatus"></div>
+      <div class="note" style="margin-top:14px;">El procesamiento se hace en tu navegador. Una vez cargado, andá a la pestaña "Situación de Cobranzas" para ver el resultado. El botón de datos de muestra sirve para mostrarle la herramienta a alguien sin tener que compartir el archivo país real.</div>
+    </div>
+
+    <div class="upload-card">
+      <label style="display:block;font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px;">💾 Guardar este mes en Google Sheets</label>
+      <div class="hint" style="margin-bottom:10px;">Guarda las oficinas del archivo que acabás de subir arriba en una hoja nueva de tu planilla de Google (vía Apps Script), armando de a poco un histórico sin que tengas que copiar nada a mano.</div>
+      <div class="upload-row">
+        <div class="upload-slot">
+          <label>Etiqueta del mes</label>
+          <input type="text" id="monthLabel" placeholder="Ej: Jul-26">
+        </div>
+        <button class="btn-reset" id="btnSaveToSheet" style="background:var(--navy);color:white;" disabled>Guardar en planilla</button>
+      </div>
+      <div class="upload-status" id="saveToSheetStatus"></div>
+      <div class="note" id="saveToSheetHint" style="margin-top:10px;">Necesita que conectes el Apps Script (Code.gs) primero — ver instrucciones dentro del archivo.</div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  Evolución de cartera: enero 2025 a junio 2026, por gerencia u oficina (135 oficinas con hasta 18 meses de historia cada una).
+  Cobranzas: se muestra el mes más nuevo guardado en tu planilla de Google Sheets, comparado contra el mes anterior guardado.
+</footer>
+
+<script>
+let DIV_SERIES = {};
+let OFFICE_HISTORY = {"months": [], "offices": {}};
+let COBRANZAS_DEFAULT = [];
+let COMPARATIVA_DEFAULT = [];
+
+const DIV_LABELS = {TUCUMAN:'Tucumán', TRELEW:'Trelew', ROSARIO:'Rosario', CORDOBA:'Córdoba', NEUQUEN:'Neuquén', CAPITAL:'Capital', 'MAR DEL PLATA':'Mar del Plata', TOTAL:'Total País'};
+const DIV_ORDER = ['NEUQUEN','TUCUMAN','TRELEW','ROSARIO','CORDOBA','CAPITAL','MAR DEL PLATA','TOTAL'];
+let MONTHS = Object.keys(DIV_SERIES);
+
+let mode = 'gerencia';
+let currentDiv = 'NEUQUEN';
+let currentOfficeCodigo = null;
+let chartCartera, chartDaMora, chartSeguro;
+
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+  });
+});
+
+/* ---- mode toggle: gerencia vs oficina ---- */
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    mode = btn.dataset.mode;
+    document.getElementById('divChips').style.display = mode === 'gerencia' ? 'flex' : 'none';
+    document.getElementById('officePickerRow').style.display = mode === 'oficina' ? 'flex' : 'none';
+    renderCartera();
+  });
+});
+
+const chipsEl = document.getElementById('divChips');
+DIV_ORDER.forEach(d => {
+  const chip = document.createElement('div');
+  chip.className = 'divchip' + (d === currentDiv ? ' active' : '');
+  chip.textContent = DIV_LABELS[d];
+  chip.addEventListener('click', () => { currentDiv = d; renderCartera(); });
+  chip.dataset.div = d;
+  chipsEl.appendChild(chip);
+});
+
+/* ---- office picker (gerencia -> oficina dropdowns) ---- */
+let officesByDiv = {};
+function rebuildOfficesByDiv() {
+  officesByDiv = {};
+  Object.entries(OFFICE_HISTORY.offices).forEach(([codigo, o]) => {
+    if (!officesByDiv[o.div]) officesByDiv[o.div] = [];
+    officesByDiv[o.div].push({ codigo, name: o.name });
+  });
+  Object.values(officesByDiv).forEach(list => list.sort((a,b) => a.name.localeCompare(b.name)));
+}
+rebuildOfficesByDiv();
+
+const pickerGerencia = document.getElementById('pickerGerencia');
+const pickerOficina = document.getElementById('pickerOficina');
+DIV_ORDER.filter(d => d !== 'TOTAL').forEach(d => {
+  const opt = document.createElement('option');
+  opt.value = d; opt.textContent = DIV_LABELS[d];
+  pickerGerencia.appendChild(opt);
+});
+pickerGerencia.value = currentDiv;
+
+function populateOficinaPicker(div) {
+  pickerOficina.innerHTML = '';
+  (officesByDiv[div] || []).forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o.codigo; opt.textContent = o.name;
+    pickerOficina.appendChild(opt);
+  });
+  if (officesByDiv[div] && officesByDiv[div].length) {
+    currentOfficeCodigo = officesByDiv[div][0].codigo;
+    pickerOficina.value = currentOfficeCodigo;
+  }
+}
+populateOficinaPicker(currentDiv);
+
+pickerGerencia.addEventListener('change', () => {
+  populateOficinaPicker(pickerGerencia.value);
+  renderCartera();
+});
+pickerOficina.addEventListener('change', () => {
+  currentOfficeCodigo = pickerOficina.value;
+  renderCartera();
+});
+
+function fmtInt(n) { return Math.round(n).toLocaleString('es-AR'); }
+function fmtPct(v) { return v.toFixed(1) + '%'; }
+
+function getSeriesForCurrentSelection() {
+  if (mode === 'gerencia') {
+    return MONTHS.map(m => {
+      const d = DIV_SERIES[m][currentDiv];
+      return d ? { cartera: d.cartera, da: d.da_pct*100, mora: d.mora_pct*100, seg: d.seg_pct*100 } : null;
+    });
+  } else {
+    const hist = OFFICE_HISTORY.offices[currentOfficeCodigo];
+    if (!hist) return MONTHS.map(() => null);
+    return MONTHS.map(m => hist.series[m] ? { cartera: hist.series[m].cartera, da: hist.series[m].da, mora: hist.series[m].mora, seg: hist.series[m].seg } : null);
+  }
+}
+
+function renderKpis(seriesArr) {
+  const valid = seriesArr.map((v,i) => v ? {v,i} : null).filter(Boolean);
+  if (valid.length < 2) { document.getElementById('kpis').innerHTML = '<div class="kpi"><div class="lbl">Sin datos suficientes</div></div>'; return; }
+  const first = valid[0].v, last = valid[valid.length-1].v;
+  const cartVar = first.cartera ? (last.cartera/first.cartera - 1) * 100 : 0;
+  const daDelta = last.da - first.da;
+  const moraDelta = last.mora - first.mora;
+  const segDelta = last.seg - first.seg;
+  const kpisEl = document.getElementById('kpis');
+  kpisEl.innerHTML = `
+    <div class="kpi"><div class="lbl">Cartera actual</div><div class="val">${fmtInt(last.cartera)}</div><div class="delta ${cartVar>=0?'up':'down'}">${cartVar>=0?'+':''}${cartVar.toFixed(1)}% en el período</div></div>
+    <div class="kpi"><div class="lbl">% Débito</div><div class="val">${fmtPct(last.da)}</div><div class="delta ${daDelta>=0?'up':'down'}">${daDelta>=0?'+':''}${daDelta.toFixed(1)}pp</div></div>
+    <div class="kpi"><div class="lbl">% Mora +3m</div><div class="val">${fmtPct(last.mora)}</div><div class="delta ${moraDelta<=0?'up':'down'}">${moraDelta>=0?'+':''}${moraDelta.toFixed(1)}pp</div></div>
+    <div class="kpi"><div class="lbl">% Seguro</div><div class="val">${fmtPct(last.seg)}</div><div class="delta ${segDelta>=0?'up':'down'}">${segDelta>=0?'+':''}${segDelta.toFixed(1)}pp</div></div>
+  `;
+}
+
+function renderCartera() {
+  document.querySelectorAll('.divchip').forEach(c => c.classList.toggle('active', c.dataset.div === currentDiv));
+  const seriesArr = getSeriesForCurrentSelection();
+
+  let title = 'Cartera y Cobranzas — ';
+  if (mode === 'gerencia') {
+    title += DIV_LABELS[currentDiv];
+  } else {
+    const hist = OFFICE_HISTORY.offices[currentOfficeCodigo];
+    title += hist ? hist.name : '—';
+  }
+  document.getElementById('pageTitle').textContent = title;
+
+  renderKpis(seriesArr);
+
+  const carteraData = seriesArr.map(v => v ? v.cartera : null);
+  const daData = seriesArr.map(v => v ? v.da : null);
+  const moraData = seriesArr.map(v => v ? v.mora : null);
+  const segData = seriesArr.map(v => v ? v.seg : null);
+
+  if (chartCartera) chartCartera.destroy();
+  chartCartera = new Chart(document.getElementById('chartCartera'), {
+    type: 'line',
+    data: { labels: MONTHS, datasets: [{ label: 'Cartera', data: carteraData, borderColor: '#0d2c4e', backgroundColor: 'rgba(13,44,78,0.08)', borderWidth: 2, pointRadius: 3, tension: 0.25, fill: true, spanGaps: true }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#8a96a3', font: { size: 9 }, maxRotation: 45 }, grid: { display: false } }, y: { beginAtZero: false, ticks: { color: '#8a96a3' }, grid: { color: '#e5e9ee' } } } }
+  });
+
+  if (chartDaMora) chartDaMora.destroy();
+  chartDaMora = new Chart(document.getElementById('chartDaMora'), {
+    type: 'line',
+    data: { labels: MONTHS, datasets: [
+      { label: '% Débito', data: daData, borderColor: '#1baf7a', borderWidth: 2, pointRadius: 2, tension: 0.25, spanGaps: true },
+      { label: '% Mora +3m', data: moraData, borderColor: '#c0362f', borderWidth: 2, pointRadius: 2, tension: 0.25, spanGaps: true }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 10, font: { size: 11 } } } },
+      scales: { x: { ticks: { color: '#8a96a3', font: { size: 9 }, maxRotation: 45 }, grid: { display: false } }, y: { beginAtZero: true, ticks: { color: '#8a96a3', callback: v => v.toFixed(1) + '%' }, grid: { color: '#e5e9ee' } } } }
+  });
+
+  if (chartSeguro) chartSeguro.destroy();
+  chartSeguro = new Chart(document.getElementById('chartSeguro'), {
+    type: 'line',
+    data: { labels: MONTHS, datasets: [{ label: '% Seguro', data: segData, borderColor: '#d4a017', backgroundColor: 'rgba(212,160,23,0.1)', borderWidth: 2, pointRadius: 3, tension: 0.25, fill: true, spanGaps: true }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#8a96a3', font: { size: 9 }, maxRotation: 45 }, grid: { display: false } }, y: { beginAtZero: false, ticks: { color: '#8a96a3', callback: v => v.toFixed(1) + '%' }, grid: { color: '#e5e9ee' } } } }
+  });
+}
+
+/* =================== COBRANZAS (comparativa + oficinas) =================== */
+
+function fmtDelta(v, isPct) {
+  if (v === null || v === undefined) return 's/d';
+  const s = v > 0 ? '+' + v.toFixed(1) : v.toFixed(1);
+  return isPct ? s + '%' : s;
+}
+function badgeColor(reds) {
+  if (reds >= 4) return '#8f1f1f';
+  if (reds === 3) return '#b8302f';
+  if (reds === 2) return '#c14a3f';
+  if (reds === 1) return '#cf6a5f';
+  return '#3fa15f';
+}
+function sevClass(avg) {
+  if (avg >= 1.5) return 'sev-3';
+  if (avg >= 0.7) return 'sev-2';
+  return 'sev-1';
+}
+function classDA(v){ if(v>=85) return 'g'; if(v>=80) return 'y'; return 'r'; }
+function classMora(v){ if(v<=10) return 'g'; if(v<=15) return 'y'; return 'r'; }
+function classSeg(v){ if(v>=25) return 'g'; if(v>=15) return 'y'; return 'r'; }
+function classDMora(v){ if(v===null||v===undefined) return 'na'; if(v<=-0.3) return 'g'; if(v<=0.3) return 'y'; return 'r'; }
+
+let lastComparativa = COMPARATIVA_DEFAULT;
+let lastOficinas = COBRANZAS_DEFAULT;
+let gerenciaFilter = 'TODAS';
+
+const pickerGerenciaCobranzas = document.getElementById('pickerGerenciaCobranzas');
+DIV_ORDER.filter(d => d !== 'TOTAL').forEach(d => {
+  const opt = document.createElement('option');
+  opt.value = d; opt.textContent = DIV_LABELS[d];
+  pickerGerenciaCobranzas.appendChild(opt);
+});
+pickerGerenciaCobranzas.addEventListener('change', () => {
+  gerenciaFilter = pickerGerenciaCobranzas.value;
+  document.getElementById('shareHint').textContent = gerenciaFilter === 'TODAS'
+    ? 'Elegí tu gerencia para ver y compartir solo tus oficinas.'
+    : 'Mostrando solo ' + DIV_LABELS[gerenciaFilter] + ' — podés compartir esta vista (captura o link) sin que se vean las demás gerencias.';
+  renderComparativa(lastComparativa);
+  renderOficinas(lastOficinas);
+});
+
+function renderComparativa(rows) {
+  lastComparativa = rows;
+  const app = document.getElementById('comparativaApp');
+  const filtered = gerenciaFilter === 'TODAS' ? rows : rows.filter(r => r.key === gerenciaFilter);
+  let html = '<table class="comp"><tr><th>Gerencia</th><th>Cartera</th><th>% Débito</th><th>% Mora</th><th>% Seguro</th></tr>';
+  filtered.forEach(r => {
+    const cls = r.key === 'TOTAL' ? 'hl' : '';
+    html += `<tr class="${cls}"><td>${r.label}</td><td>${r.cartera.toLocaleString('es-AR')}</td>
+      <td><span class="cell ${classDA(r.da)}">${r.da.toFixed(1)}%</span></td>
+      <td><span class="cell ${classMora(r.mora)}">${r.mora.toFixed(1)}%</span></td>
+      <td><span class="cell ${classSeg(r.seg)}">${r.seg.toFixed(1)}%</span></td></tr>`;
+  });
+  html += '</table>';
+  app.innerHTML = html;
+}
+
+let miniChartCounter = 0;
+const miniCharts = {};
+
+function renderOfficeTrend(codigo, canvasId) {
+  const hist = OFFICE_HISTORY.offices[String(codigo)];
+  const box = document.getElementById(canvasId).parentElement;
+  if (!hist) {
+    box.innerHTML = '<div class="detail-empty">No tengo serie histórica cargada para esta oficina (código no encontrado).</div>';
+    return;
+  }
+  const months = OFFICE_HISTORY.months.filter(m => hist.series[m]);
+  if (months.length < 2) {
+    box.innerHTML = '<div class="detail-empty">Muy pocos meses de historia disponibles para graficar.</div>';
+    return;
+  }
+  const daData = months.map(m => hist.series[m].da);
+  const moraData = months.map(m => hist.series[m].mora);
+  if (miniCharts[canvasId]) miniCharts[canvasId].destroy();
+  miniCharts[canvasId] = new Chart(document.getElementById(canvasId), {
+    type: 'line',
+    data: { labels: months, datasets: [
+      { label: '% Débito', data: daData, borderColor: '#1baf7a', borderWidth: 2, pointRadius: 2, tension: 0.25 },
+      { label: '% Mora +3m', data: moraData, borderColor: '#c0362f', borderWidth: 2, pointRadius: 2, tension: 0.25 }
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'top', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        x: { ticks: { color: '#8a96a3', font: { size: 9 }, maxRotation: 45 }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: '#8a96a3', font: { size: 10 }, callback: v => v.toFixed(0) + '%' }, grid: { color: '#e5e9ee' } }
+      } }
+  });
+}
+
+function toggleOfficeRow(tr, codigo) {
+  const isOpen = tr.classList.contains('expanded');
+  const table = tr.closest('table');
+  table.querySelectorAll('tr.detail-row').forEach(r => r.remove());
+  table.querySelectorAll('tr.office-row').forEach(r => r.classList.remove('expanded'));
+  if (isOpen) return;
+  tr.classList.add('expanded');
+  miniChartCounter++;
+  const canvasId = 'mini-' + miniChartCounter;
+  const detailTr = document.createElement('tr');
+  detailTr.className = 'detail-row';
+  const colCount = tr.children.length;
+  detailTr.innerHTML = `<td colspan="${colCount}"><div class="detail-wrap"><div class="detail-chartbox"><canvas id="${canvasId}"></canvas></div></div></td>`;
+  tr.after(detailTr);
+  renderOfficeTrend(codigo, canvasId);
+}
+
+function renderOficinas(divisionalGroups) {
+  lastOficinas = divisionalGroups;
+  const app = document.getElementById('cobranzasApp');
+  app.innerHTML = '';
+  const scoped = gerenciaFilter === 'TODAS' ? divisionalGroups : divisionalGroups.filter(d => d.key === gerenciaFilter);
+  const sorted = [...scoped].sort((a,b) => b.avg_reds - a.avg_reds);
+  sorted.forEach((div, idx) => {
+    const card = document.createElement('div');
+    card.className = 'acc-card' + (idx === 0 ? ' open' : '');
+    const header = document.createElement('div');
+    header.className = 'acc-header';
+    header.innerHTML = `
+      <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      <div class="acc-title"><div class="name">${div.label}</div><div class="meta">${div.n_offices} oficinas · Cartera ${div.cartera.toLocaleString('es-AR')} socios · hacé clic en una oficina para ver su evolución</div></div>
+      <div class="avg-badge ${sevClass(div.avg_reds)}"><div class="num">${div.avg_reds.toFixed(2)}</div><div class="lbl2">rojos/of.</div></div>
+    `;
+    header.addEventListener('click', () => card.classList.toggle('open'));
+    const body = document.createElement('div');
+    body.className = 'acc-body';
+    const table = document.createElement('table');
+    table.innerHTML = `<thead><tr><th>Oficina</th><th>% Débito</th><th>% Mora</th><th>ΔMora</th><th>% Seguro</th><th>🔴</th></tr></thead><tbody></tbody>`;
+    const tbody = table.querySelector('tbody');
+    div.offices.forEach(o => {
+      const tr = document.createElement('tr');
+      tr.className = 'office-row';
+      tr.innerHTML = `<td>${o.name}</td><td><span class="cell ${o.da_c}">${o.da.toFixed(1)}%</span></td><td><span class="cell ${o.mora_c}">${o.mora.toFixed(1)}%</span></td><td><span class="cell ${o.dmora_c}">${fmtDelta(o.dmora,false)}</span></td><td><span class="cell ${o.seg_c}">${o.seg.toFixed(1)}%</span></td><td><span class="red-count" style="background:${badgeColor(o.reds)};">${o.reds}</span></td>`;
+      tr.addEventListener('click', () => toggleOfficeRow(tr, o.codigo));
+      tbody.appendChild(tr);
+    });
+    body.appendChild(table);
+    card.appendChild(header); card.appendChild(body);
+    app.appendChild(card);
+  });
+}
+
+function loadDefault() {
+  renderComparativa(COMPARATIVA_DEFAULT);
+  renderOficinas(COBRANZAS_DEFAULT);
+  document.getElementById('uploadStatus').textContent = '';
+  document.getElementById('uploadStatus').className = 'upload-status';
+}
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  document.getElementById('fileCurrent').value = '';
+  document.getElementById('filePrev').value = '';
+  loadFromAppsScript();
+});
+
+/* ---- Datos de muestra (ficticios), para demostrar la herramienta sin usar el archivo real ---- */
+function buildSampleData() {
+  const sampleDivs = [
+    { key: 'TUCUMAN', label: 'Tucumán', offices: ['Oficina Demo A', 'Oficina Demo B', 'Oficina Demo C'] },
+    { key: 'NEUQUEN', label: 'Neuquén', offices: ['Oficina Demo D', 'Oficina Demo E', 'Oficina Demo F', 'Oficina Demo G'] },
+    { key: 'ROSARIO', label: 'Rosario', offices: ['Oficina Demo H', 'Oficina Demo I', 'Oficina Demo J'] },
+    { key: 'CAPITAL', label: 'Capital', offices: ['Oficina Demo K', 'Oficina Demo L', 'Oficina Demo M', 'Oficina Demo N'] },
+  ];
+  // simple seeded pseudo-random so cada carga da lo mismo (más fácil de explicar)
+  let seed = 42;
+  function rand() { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; }
+  function between(a, b) { return a + rand() * (b - a); }
+
+  const comparativa = [];
+  const groups = [];
+  let grandCartera = 0, grandDaNum = 0, grandMoraNum = 0, grandSegNum = 0;
+
+  sampleDivs.forEach(sd => {
+    const offices = sd.offices.map((name, i) => {
+      const cartera = Math.round(between(80, 900));
+      const da = between(70, 95);
+      const mora = between(4, 20);
+      const seg = between(8, 35);
+      const dmora = between(-2, 2);
+      const codigo = 'DEMO-' + sd.key + '-' + i;
+      const da_c = classDA(da), mora_c = classMora(mora), seg_c = classSeg(seg), dmora_c = classDMora(dmora);
+      const reds = [da_c, mora_c, seg_c, dmora_c].filter(x => x === 'r').length;
+      return { codigo, name, cartera, da, da_c, mora, mora_c, dmora, dmora_c, seg, seg_c, reds };
+    });
+    offices.sort((a,b) => b.reds - a.reds);
+    const cartera = offices.reduce((s,o) => s + o.cartera, 0);
+    const daNum = offices.reduce((s,o) => s + o.da * o.cartera, 0);
+    const moraNum = offices.reduce((s,o) => s + o.mora * o.cartera, 0);
+    const segNum = offices.reduce((s,o) => s + o.seg * o.cartera, 0);
+    const total_reds = offices.reduce((s,o) => s + o.reds, 0);
+    groups.push({ key: sd.key, label: sd.label, n_offices: offices.length, cartera, total_reds, avg_reds: total_reds / offices.length, offices });
+    comparativa.push({ key: sd.key, label: sd.label, cartera, da: daNum/cartera, mora: moraNum/cartera, seg: segNum/cartera });
+    grandCartera += cartera; grandDaNum += daNum; grandMoraNum += moraNum; grandSegNum += segNum;
+  });
+  comparativa.push({ key: 'TOTAL', label: 'Total País (muestra)', cartera: grandCartera, da: grandDaNum/grandCartera, mora: grandMoraNum/grandCartera, seg: grandSegNum/grandCartera });
+
+  return { comparativa, groups };
+}
+
+document.getElementById('btnSample').addEventListener('click', () => {
+  document.getElementById('fileCurrent').value = '';
+  document.getElementById('filePrev').value = '';
+  const sample = buildSampleData();
+  renderComparativa(sample.comparativa);
+  renderOficinas(sample.groups);
+  const statusEl = document.getElementById('uploadStatus');
+  statusEl.textContent = 'Mostrando datos de muestra (ficticios) — nombres y números inventados, solo para ver cómo funciona la herramienta.';
+  statusEl.className = 'upload-status ok';
+});
+
+function shortName(n) {
+  return String(n).replace('-ESTACION','').replace('-OFICINA','').replace('-CAMINERA','').replace('-CENTRO SERVICIAL','').replace('-UNIDAD SERVICIAL','')
+    .split(' ').map(w => w.length ? w[0].toUpperCase()+w.slice(1).toLowerCase() : w).join(' ');
+}
+
+function parseWorkbookRows(rows) {
+  let currentDivLocal = null;
+  const offices = {};
+  const divTotals = {};
+  for (const r of rows) {
+    if (!r || r.length === 0) continue;
+    const c1 = r[0], c2 = r[1], c3 = r[2];
+    if (typeof c1 === 'string' && c1.trim() && !c1.trim().toUpperCase().startsWith('TOTAL')) {
+      currentDivLocal = c1.trim().toUpperCase();
+    }
+    if (typeof c1 === 'string' && c1.trim().toUpperCase().startsWith('TOTAL')) {
+      const divName = c1.trim().replace(/total/i,'').trim().toUpperCase();
+      const cartera = r[3], da = r[9], mora = r[13], seg = r[20];
+      if (typeof cartera === 'number') {
+        divTotals[divName || 'TOTAL'] = { cartera, da: da*100, mora: mora*100, seg: seg*100 };
+      }
+      continue;
+    }
+    if (c2 == null || c3 == null) continue;
+    if (typeof c2 === 'string' && c2.toUpperCase().includes('TOTAL')) continue;
+    const cartera = r[3], da = r[9], mora = r[13], seg = r[20];
+    if (typeof cartera !== 'number' || typeof da !== 'number' || typeof mora !== 'number' || typeof seg !== 'number') continue;
+    offices[String(c3)] = { div: currentDivLocal, filial: String(c2), cartera, da, mora, seg };
+  }
+  return { offices, divTotals };
+}
+
+async function readWorkbook(file) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array' });
+  const sheetName = wb.SheetNames.includes('Hoja1') ? 'Hoja1' : wb.SheetNames[0];
+  const sheet = wb.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
+  return parseWorkbookRows(rows);
+}
+
+function buildComparativaFromTotals(divTotals) {
+  const order = ['TUCUMAN','TRELEW','ROSARIO','CORDOBA','NEUQUEN','CAPITAL','MAR DEL PLATA'];
+  const rows = [];
+  order.forEach(k => {
+    if (divTotals[k]) rows.push({ key:k, label: DIV_LABELS[k] || k, cartera: Math.round(divTotals[k].cartera), da: divTotals[k].da, mora: divTotals[k].mora, seg: divTotals[k].seg });
+  });
+  const generalKey = Object.keys(divTotals).find(k => k.includes('GENERAL') || k === 'TOTAL' || k === '');
+  if (generalKey !== undefined && divTotals[generalKey]) {
+    rows.push({ key:'TOTAL', label:'Total País', cartera: Math.round(divTotals[generalKey].cartera), da: divTotals[generalKey].da, mora: divTotals[generalKey].mora, seg: divTotals[generalKey].seg });
+  }
+  return rows;
+}
+
+function buildOficinasFromParsed(current, prevOffices) {
+  const byDiv = {};
+  Object.entries(current.offices).forEach(([codigo, o]) => {
+    if (!o.div) return;
+    if (!byDiv[o.div]) byDiv[o.div] = [];
+    const prevMora = prevOffices ? (prevOffices[codigo] ? prevOffices[codigo].mora : null) : null;
+    const dmora = prevMora !== null ? (o.mora - prevMora) : null;
+    const da_c = classDA(o.da), mora_c = classMora(o.mora), seg_c = classSeg(o.seg), dmora_c = classDMora(dmora);
+    const reds = [da_c,mora_c,seg_c,dmora_c].filter(x => x === 'r').length;
+    byDiv[o.div].push({ codigo, name: shortName(o.filial), cartera: o.cartera, da: o.da, da_c, mora: o.mora, mora_c, dmora, dmora_c, seg: o.seg, seg_c, reds });
+  });
+  const groups = Object.entries(byDiv).map(([key, offices]) => {
+    offices.sort((a,b) => b.reds - a.reds);
+    const cartera = offices.reduce((s,o) => s+o.cartera, 0);
+    const total_reds = offices.reduce((s,o) => s+o.reds, 0);
+    return { key, label: DIV_LABELS[key] || key, n_offices: offices.length, cartera, total_reds, avg_reds: offices.length ? total_reds/offices.length : 0, offices };
+  });
+  return groups;
+}
+
+let prevOfficesData = null;
+
+document.getElementById('filePrev').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) { prevOfficesData = null; return; }
+  try {
+    const parsed = await readWorkbook(f);
+    prevOfficesData = parsed.offices;
+    document.getElementById('uploadStatus').textContent = 'Mes anterior cargado. Ahora subí el archivo del mes actual (o volvé a subirlo) para recalcular con la variación de mora.';
+    document.getElementById('uploadStatus').className = 'upload-status ok';
+  } catch (err) {
+    document.getElementById('uploadStatus').textContent = 'No pude leer el archivo del mes anterior: ' + err.message;
+    document.getElementById('uploadStatus').className = 'upload-status err';
+  }
+});
+
+document.getElementById('fileCurrent').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const statusEl = document.getElementById('uploadStatus');
+  try {
+    const parsed = await readWorkbook(f);
+    if (Object.keys(parsed.offices).length === 0) {
+      throw new Error('No encontré filas de oficinas con el formato esperado (Divisional, Filial, Código, Cartera, ... DA%, ... Mora%, ... Seguro%).');
+    }
+    lastParsedForSheet = parsed;
+    const comp = buildComparativaFromTotals(parsed.divTotals);
+    const groups = buildOficinasFromParsed(parsed, prevOfficesData);
+    renderComparativa(comp.length ? comp : COMPARATIVA_DEFAULT);
+    renderOficinas(groups);
+    statusEl.textContent = `Listo — ${Object.keys(parsed.offices).length} oficinas procesadas de "${f.name}"` + (prevOfficesData ? ' (con variación de mora vs mes anterior).' : ' (sin mes anterior — subí uno para ver la variación de mora).');
+    statusEl.className = 'upload-status ok';
+  } catch (err) {
+    statusEl.textContent = 'No pude procesar el archivo: ' + err.message + '. Verificá que sea el mismo formato que el archivo país mensual habitual.';
+    statusEl.className = 'upload-status err';
+  }
+});
+
+/* =================== Apps Script backend =================== */
+// Pegá acá la URL de implementación de tu Apps Script (Code.gs) cuando la tengas.
+// Mientras diga 'PEGA_ACA_TU_URL_DE_IMPLEMENTACION', el candado usa el código de
+// respaldo de abajo y el botón de "guardar en planilla" queda desactivado.
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz8GQmLzMlSNu4E7xxrx5EXwcn5V4OY61bLkvDR7RlLE5LOV9C0m-mzClYHEW3_9p3SZQ/exec';
+const FALLBACK_TOKEN = 'ACA-ETKA9YDTT1'; // se usa solo si APPS_SCRIPT_URL no está configurada
+const scriptConfigured = APPS_SCRIPT_URL.indexOf('http') === 0;
+
+/* =================== Pantalla de acceso =================== */
+const STORAGE_KEY = 'aca_cartera_cobranzas_access';
+let sessionToken = null;
+
+function unlock(token) {
+  sessionToken = token;
+  document.body.classList.remove('locked');
+  document.getElementById('lockScreen').remove();
+  document.getElementById('btnSaveToSheet').disabled = !scriptConfigured;
+  document.getElementById('saveToSheetHint').textContent = scriptConfigured
+    ? 'Conectado a tu planilla de Google Sheets. Cada mes que guardes acá crea (o reemplaza) una hoja "Datos_<mes>" ahí.'
+    : 'Para guardar en Google Sheets, primero conectá el Apps Script (ver Code.gs).';
+  loadFromAppsScript();
+}
+
+async function checkTokenRemote(token) {
+  const res = await fetch(APPS_SCRIPT_URL + '?action=checkToken&token=' + encodeURIComponent(token));
+  const data = await res.json();
+  return !!data.valid;
+}
+
+const savedToken = localStorage.getItem(STORAGE_KEY);
+if (savedToken && !scriptConfigured && savedToken === FALLBACK_TOKEN) {
+  unlock(savedToken);
+} else if (savedToken && scriptConfigured) {
+  checkTokenRemote(savedToken).then(ok => { if (ok) unlock(savedToken); });
+}
+
+document.getElementById('lockBtn').addEventListener('click', tryUnlock);
+document.getElementById('lockInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+
+async function tryUnlock() {
+  const val = document.getElementById('lockInput').value.trim();
+  const errEl = document.getElementById('lockError');
+  errEl.textContent = '';
+  if (scriptConfigured) {
+    errEl.textContent = 'Verificando...';
+    const ok = await checkTokenRemote(val);
+    if (ok) { localStorage.setItem(STORAGE_KEY, val); unlock(val); }
+    else errEl.textContent = 'Código incorrecto.';
+  } else {
+    if (val === FALLBACK_TOKEN) { localStorage.setItem(STORAGE_KEY, val); unlock(val); }
+    else errEl.textContent = 'Código incorrecto.';
+  }
+}
+
+/* =================== Cargar TODO el histórico desde el Apps Script =================== */
+const MONTH_ORDER_KEY = {};
+['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'].forEach((m,i) => MONTH_ORDER_KEY[m] = i);
+function monthSortValue(label) {
+  const [mes, anio] = label.split('-');
+  return parseInt('20' + anio, 10) * 12 + (MONTH_ORDER_KEY[mes] || 0);
+}
+
+function setLoadingState(msg, isError) {
+  const html = `<div class="detail-empty" style="padding:24px 0;text-align:center;${isError ? 'color:var(--red);' : ''}">${msg}</div>`;
+  document.getElementById('comparativaApp').innerHTML = html;
+  document.getElementById('cobranzasApp').innerHTML = '';
+  document.getElementById('kpis').innerHTML = `<div class="kpi"><div class="lbl">${msg}</div></div>`;
+}
+
+async function loadFromAppsScript() {
+  if (!scriptConfigured) {
+    setLoadingState('El Apps Script todavía no está conectado — ver Code.gs para instrucciones.', true);
+    return;
+  }
+  setLoadingState('Cargando el histórico desde tu planilla de Google Sheets...', false);
+  try {
+    const res = await fetch(APPS_SCRIPT_URL + '?action=getAllData&token=' + encodeURIComponent(sessionToken));
+    const raw = await res.json();
+    if (raw.error) { setLoadingState('Error al traer los datos: ' + raw.error, true); return; }
+    if (!raw.months || raw.months.length === 0) {
+      setLoadingState('Todavía no hay ningún mes guardado en tu planilla. Usá el "Importador de Histórico" para cargar los 18 meses de una vez, o subí un archivo en la pestaña "Cargar Archivo".', true);
+      MONTHS = []; DIV_SERIES = {}; OFFICE_HISTORY = { months: [], offices: {} };
+      return;
+    }
+    applyFetchedData(raw);
+  } catch (err) {
+    setLoadingState('No pude conectar con el Apps Script: ' + err.message, true);
+  }
+}
+
+function applyFetchedData(raw) {
+  const months = raw.months.slice().sort((a,b) => monthSortValue(a) - monthSortValue(b));
+  MONTHS = months;
+
+  const offices = {};
+  months.forEach(m => {
+    (raw.data[m] || []).forEach(row => {
+      const codigo = String(row.Codigo);
+      if (!offices[codigo]) offices[codigo] = { name: row.Filial, div: row.Divisional, series: {} };
+      offices[codigo].series[m] = { cartera: Number(row.Cartera), da: Number(row['DA%']), mora: Number(row['Mora%']), seg: Number(row['Seguro%']) };
+    });
+  });
+  OFFICE_HISTORY = { months, offices };
+  rebuildOfficesByDiv();
+  populateOficinaPicker(currentDiv);
+
+  DIV_SERIES = {};
+  months.forEach(m => {
+    const agg = {};
+    Object.values(offices).forEach(o => {
+      const v = o.series[m]; if (!v) return;
+      const d = o.div;
+      if (!agg[d]) agg[d] = { cartera: 0, daNum: 0, moraNum: 0, segNum: 0 };
+      agg[d].cartera += v.cartera;
+      agg[d].daNum += v.da / 100 * v.cartera;
+      agg[d].moraNum += v.mora / 100 * v.cartera;
+      agg[d].segNum += v.seg / 100 * v.cartera;
+    });
+    DIV_SERIES[m] = {};
+    let totCart = 0, totDa = 0, totMora = 0, totSeg = 0;
+    Object.entries(agg).forEach(([d, a]) => {
+      if (!a.cartera) return;
+      DIV_SERIES[m][d] = { cartera: Math.round(a.cartera), da_pct: a.daNum / a.cartera, mora_pct: a.moraNum / a.cartera, seg_pct: a.segNum / a.cartera };
+      totCart += a.cartera; totDa += a.daNum; totMora += a.moraNum; totSeg += a.segNum;
+    });
+    if (totCart > 0) {
+      DIV_SERIES[m]['TOTAL'] = { cartera: Math.round(totCart), da_pct: totDa / totCart, mora_pct: totMora / totCart, seg_pct: totSeg / totCart };
+    }
+  });
+
+  const lastMonth = months[months.length - 1];
+  const prevMonth = months.length > 1 ? months[months.length - 2] : null;
+  const currentOffices = {};
+  const prevOfficesLocal = {};
+  Object.entries(offices).forEach(([codigo, o]) => {
+    if (o.series[lastMonth]) {
+      const v = o.series[lastMonth];
+      currentOffices[codigo] = { div: o.div, filial: o.name, cartera: v.cartera, da: v.da, mora: v.mora, seg: v.seg };
+    }
+    if (prevMonth && o.series[prevMonth]) prevOfficesLocal[codigo] = { mora: o.series[prevMonth].mora };
+  });
+  const divTotalsLast = {};
+  if (DIV_SERIES[lastMonth]) {
+    Object.entries(DIV_SERIES[lastMonth]).forEach(([d, v]) => {
+      divTotalsLast[d] = { cartera: v.cartera, da: v.da_pct * 100, mora: v.mora_pct * 100, seg: v.seg_pct * 100 };
+    });
+  }
+
+  prevOfficesData = prevMonth ? prevOfficesLocal : null;
+  const comp = buildComparativaFromTotals(divTotalsLast);
+  const groups = buildOficinasFromParsed({ offices: currentOffices }, prevOfficesData);
+  COMPARATIVA_DEFAULT = comp;
+  COBRANZAS_DEFAULT = groups;
+  document.getElementById('uploadStatus').textContent = `Mostrando ${lastMonth} (el mes más nuevo guardado en tu planilla) — ${months.length} meses de historia en total.`;
+  document.getElementById('uploadStatus').className = 'upload-status ok';
+  loadDefault();
+  renderCartera();
+}
+
+/* =================== Guardar mes en Google Sheets =================== */
+let lastParsedForSheet = null; // { offices: {...}, divTotals: {...} } del último archivo subido
+
+document.getElementById('btnSaveToSheet').addEventListener('click', async () => {
+  const statusEl = document.getElementById('saveToSheetStatus');
+  if (!scriptConfigured) { statusEl.textContent = 'Apps Script no configurado todavía.'; statusEl.className='upload-status err'; return; }
+  if (!lastParsedForSheet) { statusEl.textContent = 'Primero subí un archivo del mes actual arriba.'; statusEl.className='upload-status err'; return; }
+  const month = document.getElementById('monthLabel').value.trim();
+  if (!month) { statusEl.textContent = 'Poné una etiqueta de mes (ej: Jul-26).'; statusEl.className='upload-status err'; return; }
+  statusEl.textContent = 'Guardando...'; statusEl.className = 'upload-status';
+  try {
+    const officesArr = Object.entries(lastParsedForSheet.offices).map(([codigo,o]) => ({codigo, filial:o.filial, div:o.div, cartera:o.cartera, da:o.da, mora:o.mora, seg:o.seg}));
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action:'saveMonth', token: sessionToken, month, offices: officesArr, divTotals: lastParsedForSheet.divTotals })
+    });
+    const data = await res.json();
+    if (data.ok) { statusEl.textContent = `Guardado: ${data.count} oficinas en la hoja "Datos_${data.month}" de tu planilla.`; statusEl.className = 'upload-status ok'; }
+    else { statusEl.textContent = 'Error: ' + (data.error || 'desconocido'); statusEl.className = 'upload-status err'; }
+  } catch (err) {
+    statusEl.textContent = 'No pude conectar con el Apps Script: ' + err.message;
+    statusEl.className = 'upload-status err';
+  }
+});
+</script>
+</body>
+</html>
