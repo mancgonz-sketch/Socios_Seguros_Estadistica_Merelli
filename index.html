@@ -170,7 +170,7 @@
       <h3>Cartera de Socios (cantidad)</h3>
       <div class="sub">Enero 2025 — Junio 2026</div>
       <div class="chartbox"><canvas id="chartCartera"></canvas></div>
-      <div class="note">La línea azul es la cartera total; la línea amarilla es el vitalicio (una parte de ese total, con su propia escala en el mismo eje). Disponible en todo el período; enero-julio 2025 se reconstruyó desde el detalle por localidad, ya que el reporte mensual de esos meses no traía el total combinado directamente.</div>
+      <div class="note">La línea azul (eje izquierdo) es la cartera total; la línea amarilla (eje derecho, escala propia) es el vitalicio, para que se note su propia tendencia. Disponible en todo el período; enero-julio 2025 se reconstruyó desde el detalle por localidad, ya que el reporte mensual de esos meses no traía el total combinado directamente.</div>
     </div>
 
     <div class="card">
@@ -400,16 +400,29 @@ function renderCartera() {
 
   if (chartCartera) chartCartera.destroy();
   const hayVitalicio = vitalicioData.some(v => v !== null);
+  const carteraValidos = carteraData.filter(v => v !== null);
+  const carteraMin = Math.min(...carteraValidos), carteraMax = Math.max(...carteraValidos);
+  const carteraMargen = (carteraMax - carteraMin) * 0.15 || carteraMax * 0.02;
+  const vitalicioValidos = vitalicioData.filter(v => v !== null);
+  let vitMin = 0, vitMax = 1;
+  if (vitalicioValidos.length) {
+    vitMin = Math.min(...vitalicioValidos); vitMax = Math.max(...vitalicioValidos);
+    const vitMargen = (vitMax - vitMin) * 0.15 || vitMax * 0.02;
+    vitMin = Math.round(vitMin - vitMargen); vitMax = Math.round(vitMax + vitMargen);
+  }
   chartCartera = new Chart(document.getElementById('chartCartera'), {
     type: 'line',
     data: { labels: MONTHS, datasets: [
-      { label: 'Cartera total', data: carteraData, borderColor: '#0d2c4e', backgroundColor: 'rgba(13,44,78,0.08)', borderWidth: 2, pointRadius: 3, tension: 0.25, fill: true, spanGaps: true },
-      ...(hayVitalicio ? [{ label: 'Vitalicio', data: vitalicioData, borderColor: '#d4a017', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 2, tension: 0.25, fill: false, spanGaps: true }] : [])
+      { label: 'Cartera total', data: carteraData, borderColor: '#0d2c4e', backgroundColor: 'rgba(13,44,78,0.08)', borderWidth: 2, pointRadius: 3, tension: 0.25, fill: true, spanGaps: true, yAxisID: 'y' },
+      ...(hayVitalicio ? [{ label: 'Vitalicio', data: vitalicioData, borderColor: '#d4a017', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 2, tension: 0.25, fill: false, spanGaps: true, yAxisID: 'y1' }] : [])
     ] },
     options: { responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: hayVitalicio, position: 'top', labels: { boxWidth: 10, font: { size: 11 } } } },
-      scales: { x: { ticks: { color: '#8a96a3', font: { size: 9 }, maxRotation: 45 }, grid: { display: false } },
-        y: { beginAtZero: false, ticks: { color: '#8a96a3' }, grid: { color: '#e5e9ee' } } } }
+      scales: {
+        x: { ticks: { color: '#8a96a3', font: { size: 9 }, maxRotation: 45 }, grid: { display: false } },
+        y: { type: 'linear', position: 'left', min: Math.round(carteraMin - carteraMargen), max: Math.round(carteraMax + carteraMargen), ticks: { color: '#0d2c4e' }, grid: { color: '#e5e9ee' } },
+        y1: { type: 'linear', position: 'right', min: vitMin, max: vitMax, display: hayVitalicio, ticks: { color: '#d4a017' }, grid: { display: false } }
+      } }
   });
 
   if (chartDaMora) chartDaMora.destroy();
