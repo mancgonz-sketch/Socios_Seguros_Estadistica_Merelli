@@ -170,7 +170,7 @@
       <h3>Cartera de Socios (cantidad)</h3>
       <div class="sub">Enero 2025 — Junio 2026</div>
       <div class="chartbox"><canvas id="chartCartera"></canvas></div>
-      <div class="note">Cada barra muestra el total desagregado en cotizante (azul) + vitalicio (dorado). Pasá el mouse para ver el total. El desglose está disponible en todo el período; enero-julio 2025 se reconstruyó desde el detalle por localidad, ya que el reporte mensual de esos meses no traía el total combinado directamente.</div>
+      <div class="note">La línea azul es la cartera total; la línea amarilla es el vitalicio (una parte de ese total, con su propia escala en el mismo eje). Disponible en todo el período; enero-julio 2025 se reconstruyó desde el detalle por localidad, ya que el reporte mensual de esos meses no traía el total combinado directamente.</div>
     </div>
 
     <div class="card">
@@ -393,42 +393,21 @@ function renderCartera() {
   renderKpis(seriesArr);
 
   const carteraData = seriesArr.map(v => v ? v.cartera : null);
-  const cotizanteData = seriesArr.map(v => (v && v.cotizante !== null && v.cotizante !== undefined) ? v.cotizante : null);
-  const vitalicioTopData = seriesArr.map((v,i) => {
-    const c = cotizanteData[i];
-    if (c === null || !v || v.vitalicio === null || v.vitalicio === undefined) return null;
-    return c + v.vitalicio; // borde superior = cotizante + vitalicio, para que el relleno entre curvas sea exactamente el vitalicio
-  });
+  const vitalicioData = seriesArr.map(v => (v && v.vitalicio !== null && v.vitalicio !== undefined) ? v.vitalicio : null);
   const daData = seriesArr.map(v => v ? v.da : null);
   const moraData = seriesArr.map(v => v ? v.mora : null);
   const segData = seriesArr.map(v => v ? v.seg : null);
 
   if (chartCartera) chartCartera.destroy();
-  const hayDesglose = cotizanteData.some(v => v !== null);
+  const hayVitalicio = vitalicioData.some(v => v !== null);
   chartCartera = new Chart(document.getElementById('chartCartera'), {
     type: 'line',
-    data: { labels: MONTHS, datasets: hayDesglose ? [
-      { label: 'Cotizante', data: cotizanteData, borderColor: '#0d2c4e', backgroundColor: 'rgba(13,44,78,0.75)', fill: 'origin', borderWidth: 1.5, pointRadius: 2, tension: 0.25, spanGaps: true },
-      { label: 'Vitalicio', data: vitalicioTopData, borderColor: '#d4a017', backgroundColor: 'rgba(212,160,23,0.85)', fill: '-1', borderWidth: 1.5, pointRadius: 2, tension: 0.25, spanGaps: true }
-    ] : [
-      { label: 'Cartera', data: carteraData, borderColor: '#0d2c4e', backgroundColor: 'rgba(13,44,78,0.08)', borderWidth: 2, pointRadius: 3, tension: 0.25, fill: true, spanGaps: true }
+    data: { labels: MONTHS, datasets: [
+      { label: 'Cartera total', data: carteraData, borderColor: '#0d2c4e', backgroundColor: 'rgba(13,44,78,0.08)', borderWidth: 2, pointRadius: 3, tension: 0.25, fill: true, spanGaps: true },
+      ...(hayVitalicio ? [{ label: 'Vitalicio', data: vitalicioData, borderColor: '#d4a017', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 2, tension: 0.25, fill: false, spanGaps: true }] : [])
     ] },
     options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: hayDesglose, position: 'top', labels: { boxWidth: 10, font: { size: 11 } } },
-        tooltip: { callbacks: {
-          label: (item) => {
-            if (item.dataset.label === 'Cotizante') return 'Cotizante: ' + Math.round(item.parsed.y).toLocaleString('es-AR');
-            if (item.dataset.label === 'Vitalicio') {
-              const c = cotizanteData[item.dataIndex] || 0;
-              return 'Vitalicio: ' + Math.round(item.parsed.y - c).toLocaleString('es-AR');
-            }
-            return item.dataset.label + ': ' + Math.round(item.parsed.y).toLocaleString('es-AR');
-          },
-          footer: (items) => {
-            const i = items[0].dataIndex;
-            return carteraData[i] != null ? 'Total: ' + Math.round(carteraData[i]).toLocaleString('es-AR') : '';
-          }
-        } } },
+      plugins: { legend: { display: hayVitalicio, position: 'top', labels: { boxWidth: 10, font: { size: 11 } } } },
       scales: { x: { ticks: { color: '#8a96a3', font: { size: 9 }, maxRotation: 45 }, grid: { display: false } },
         y: { beginAtZero: false, ticks: { color: '#8a96a3' }, grid: { color: '#e5e9ee' } } } }
   });
