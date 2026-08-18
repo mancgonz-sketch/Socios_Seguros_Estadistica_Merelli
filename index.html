@@ -170,7 +170,7 @@
       <h3>Cartera de Socios (cantidad)</h3>
       <div class="sub">Enero 2025 — Junio 2026</div>
       <div class="chartbox"><canvas id="chartCartera"></canvas></div>
-      <div class="note">Cartera de socios, incluye vitalicios en todo el período (enero 2025 a junio 2026). Para enero-julio 2025 se reconstruyó desde el detalle por localidad (cotizantes + vitalicios), ya que el reporte mensual de esos meses no traía el total combinado directamente.</div>
+      <div class="note">Cada barra muestra el total desagregado en cotizante (azul) + vitalicio (dorado). Pasá el mouse para ver el total. El desglose está disponible en todo el período; enero-julio 2025 se reconstruyó desde el detalle por localidad, ya que el reporte mensual de esos meses no traía el total combinado directamente.</div>
     </div>
 
     <div class="card">
@@ -351,12 +351,12 @@ function getSeriesForCurrentSelection() {
   if (mode === 'gerencia') {
     return MONTHS.map(m => {
       const d = DIV_SERIES[m][currentDiv];
-      return d ? { cartera: d.cartera, da: d.da_pct*100, mora: d.mora_pct*100, seg: d.seg_pct*100 } : null;
+      return d ? { cartera: d.cartera, da: d.da_pct*100, mora: d.mora_pct*100, seg: d.seg_pct*100, vitalicio: d.vitalicio, cotizante: d.cotizante } : null;
     });
   } else {
     const hist = OFFICE_HISTORY.offices[currentOfficeCodigo];
     if (!hist) return MONTHS.map(() => null);
-    return MONTHS.map(m => hist.series[m] ? { cartera: hist.series[m].cartera, da: hist.series[m].da, mora: hist.series[m].mora, seg: hist.series[m].seg } : null);
+    return MONTHS.map(m => hist.series[m] ? { cartera: hist.series[m].cartera, da: hist.series[m].da, mora: hist.series[m].mora, seg: hist.series[m].seg, vitalicio: hist.series[m].vitalicio, cotizante: hist.series[m].cotizante } : null);
   }
 }
 
@@ -393,16 +393,34 @@ function renderCartera() {
   renderKpis(seriesArr);
 
   const carteraData = seriesArr.map(v => v ? v.cartera : null);
+  const vitalicioData = seriesArr.map(v => v && v.vitalicio !== null && v.vitalicio !== undefined ? v.vitalicio : null);
+  const cotizanteData = seriesArr.map((v,i) => {
+    if (!v) return null;
+    if (v.cotizante !== null && v.cotizante !== undefined) return v.cotizante;
+    return null; // si no hay desglose para ese mes, no se apila (queda hueco)
+  });
   const daData = seriesArr.map(v => v ? v.da : null);
   const moraData = seriesArr.map(v => v ? v.mora : null);
   const segData = seriesArr.map(v => v ? v.seg : null);
 
   if (chartCartera) chartCartera.destroy();
+  const hayDesglose = vitalicioData.some(v => v !== null);
   chartCartera = new Chart(document.getElementById('chartCartera'), {
-    type: 'line',
-    data: { labels: MONTHS, datasets: [{ label: 'Cartera', data: carteraData, borderColor: '#0d2c4e', backgroundColor: 'rgba(13,44,78,0.08)', borderWidth: 2, pointRadius: 3, tension: 0.25, fill: true, spanGaps: true }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-      scales: { x: { ticks: { color: '#8a96a3', font: { size: 9 }, maxRotation: 45 }, grid: { display: false } }, y: { beginAtZero: false, ticks: { color: '#8a96a3' }, grid: { color: '#e5e9ee' } } } }
+    type: 'bar',
+    data: { labels: MONTHS, datasets: hayDesglose ? [
+      { label: 'Cotizante', data: cotizanteData, backgroundColor: '#0d2c4e', stack: 's', borderRadius: 3 },
+      { label: 'Vitalicio', data: vitalicioData, backgroundColor: '#d4a017', stack: 's', borderRadius: 3 }
+    ] : [
+      { label: 'Cartera', data: carteraData, backgroundColor: '#0d2c4e', borderRadius: 3 }
+    ] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: hayDesglose, position: 'top', labels: { boxWidth: 10, font: { size: 11 } } },
+        tooltip: { callbacks: { footer: (items) => {
+          const i = items[0].dataIndex;
+          return carteraData[i] != null ? 'Total: ' + Math.round(carteraData[i]).toLocaleString('es-AR') : '';
+        } } } },
+      scales: { x: { stacked: hayDesglose, ticks: { color: '#8a96a3', font: { size: 9 }, maxRotation: 45 }, grid: { display: false } },
+        y: { stacked: hayDesglose, beginAtZero: false, ticks: { color: '#8a96a3' }, grid: { color: '#e5e9ee' } } } }
   });
 
   if (chartDaMora) chartDaMora.destroy();
@@ -856,7 +874,8 @@ function applyFetchedData(raw) {
       if (!offices[codigo]) offices[codigo] = { name: row.Filial, div: row.Divisional, series: {} };
       offices[codigo].series[m] = {
         cartera: parseNum(row.Cartera) || 0,
-        da: parseNum(row['DA%']), mora: parseNum(row['Mora%']), seg: parseNum(row['Seguro%'])
+        da: parseNum(row['DA%']), mora: parseNum(row['Mora%']), seg: parseNum(row['Seguro%']),
+        vitalicio: parseNum(row['Vitalicio']), cotizante: parseNum(row['Cotizante'])
       };
     });
   });
@@ -870,7 +889,7 @@ function applyFetchedData(raw) {
     Object.values(offices).forEach(o => {
       const v = o.series[m]; if (!v) return;
       const d = o.div;
-      if (!agg[d]) agg[d] = { carteraTotal: 0, carteraConDatos: 0, daNum: 0, moraNum: 0, segNum: 0 };
+      if (!agg[d]) agg[d] = { carteraTotal: 0, carteraConDatos: 0, daNum: 0, moraNum: 0, segNum: 0, vitalicio: 0, cotizante: 0, conVitalicio: false };
       agg[d].carteraTotal += v.cartera; // toda la cartera, se muestre o no el % de esa oficina
       if (v.da !== null && v.mora !== null && v.seg !== null) {
         // solo las oficinas con dato completo entran al promedio ponderado, para no diluirlo
@@ -879,26 +898,36 @@ function applyFetchedData(raw) {
         agg[d].moraNum += v.mora / 100 * v.cartera;
         agg[d].segNum += v.seg / 100 * v.cartera;
       }
+      if (v.vitalicio !== null && v.cotizante !== null) {
+        agg[d].vitalicio += v.vitalicio;
+        agg[d].cotizante += v.cotizante;
+        agg[d].conVitalicio = true;
+      }
     });
     DIV_SERIES[m] = {};
-    let totCartTotal = 0, totCartConDatos = 0, totDa = 0, totMora = 0, totSeg = 0;
+    let totCartTotal = 0, totCartConDatos = 0, totDa = 0, totMora = 0, totSeg = 0, totVit = 0, totCotiz = 0, totConVit = false;
     Object.entries(agg).forEach(([d, a]) => {
       if (!a.carteraTotal) return;
       DIV_SERIES[m][d] = {
         cartera: Math.round(a.carteraTotal),
         da_pct: a.carteraConDatos ? a.daNum / a.carteraConDatos : 0,
         mora_pct: a.carteraConDatos ? a.moraNum / a.carteraConDatos : 0,
-        seg_pct: a.carteraConDatos ? a.segNum / a.carteraConDatos : 0
+        seg_pct: a.carteraConDatos ? a.segNum / a.carteraConDatos : 0,
+        vitalicio: a.conVitalicio ? Math.round(a.vitalicio) : null,
+        cotizante: a.conVitalicio ? Math.round(a.cotizante) : null
       };
       totCartTotal += a.carteraTotal; totCartConDatos += a.carteraConDatos;
       totDa += a.daNum; totMora += a.moraNum; totSeg += a.segNum;
+      if (a.conVitalicio) { totVit += a.vitalicio; totCotiz += a.cotizante; totConVit = true; }
     });
     if (totCartTotal > 0) {
       DIV_SERIES[m]['TOTAL'] = {
         cartera: Math.round(totCartTotal),
         da_pct: totCartConDatos ? totDa / totCartConDatos : 0,
         mora_pct: totCartConDatos ? totMora / totCartConDatos : 0,
-        seg_pct: totCartConDatos ? totSeg / totCartConDatos : 0
+        seg_pct: totCartConDatos ? totSeg / totCartConDatos : 0,
+        vitalicio: totConVit ? Math.round(totVit) : null,
+        cotizante: totConVit ? Math.round(totCotiz) : null
       };
     }
   });
