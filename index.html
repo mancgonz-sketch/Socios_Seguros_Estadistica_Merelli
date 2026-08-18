@@ -843,12 +843,21 @@ function applyFetchedData(raw) {
   const months = raw.months.slice().sort((a,b) => monthSortValue(a) - monthSortValue(b));
   MONTHS = months;
 
+  function parseNum(v) {
+    if (v === null || v === undefined || v === '') return null;
+    const n = Number(v);
+    return isNaN(n) ? null : n;
+  }
+
   const offices = {};
   months.forEach(m => {
     (raw.data[m] || []).forEach(row => {
       const codigo = String(row.Codigo);
       if (!offices[codigo]) offices[codigo] = { name: row.Filial, div: row.Divisional, series: {} };
-      offices[codigo].series[m] = { cartera: Number(row.Cartera), da: Number(row['DA%']), mora: Number(row['Mora%']), seg: Number(row['Seguro%']) };
+      offices[codigo].series[m] = {
+        cartera: parseNum(row.Cartera) || 0,
+        da: parseNum(row['DA%']), mora: parseNum(row['Mora%']), seg: parseNum(row['Seguro%'])
+      };
     });
   });
   OFFICE_HISTORY = { months, offices };
@@ -861,21 +870,36 @@ function applyFetchedData(raw) {
     Object.values(offices).forEach(o => {
       const v = o.series[m]; if (!v) return;
       const d = o.div;
-      if (!agg[d]) agg[d] = { cartera: 0, daNum: 0, moraNum: 0, segNum: 0 };
-      agg[d].cartera += v.cartera;
-      agg[d].daNum += v.da / 100 * v.cartera;
-      agg[d].moraNum += v.mora / 100 * v.cartera;
-      agg[d].segNum += v.seg / 100 * v.cartera;
+      if (!agg[d]) agg[d] = { carteraTotal: 0, carteraConDatos: 0, daNum: 0, moraNum: 0, segNum: 0 };
+      agg[d].carteraTotal += v.cartera; // toda la cartera, se muestre o no el % de esa oficina
+      if (v.da !== null && v.mora !== null && v.seg !== null) {
+        // solo las oficinas con dato completo entran al promedio ponderado, para no diluirlo
+        agg[d].carteraConDatos += v.cartera;
+        agg[d].daNum += v.da / 100 * v.cartera;
+        agg[d].moraNum += v.mora / 100 * v.cartera;
+        agg[d].segNum += v.seg / 100 * v.cartera;
+      }
     });
     DIV_SERIES[m] = {};
-    let totCart = 0, totDa = 0, totMora = 0, totSeg = 0;
+    let totCartTotal = 0, totCartConDatos = 0, totDa = 0, totMora = 0, totSeg = 0;
     Object.entries(agg).forEach(([d, a]) => {
-      if (!a.cartera) return;
-      DIV_SERIES[m][d] = { cartera: Math.round(a.cartera), da_pct: a.daNum / a.cartera, mora_pct: a.moraNum / a.cartera, seg_pct: a.segNum / a.cartera };
-      totCart += a.cartera; totDa += a.daNum; totMora += a.moraNum; totSeg += a.segNum;
+      if (!a.carteraTotal) return;
+      DIV_SERIES[m][d] = {
+        cartera: Math.round(a.carteraTotal),
+        da_pct: a.carteraConDatos ? a.daNum / a.carteraConDatos : 0,
+        mora_pct: a.carteraConDatos ? a.moraNum / a.carteraConDatos : 0,
+        seg_pct: a.carteraConDatos ? a.segNum / a.carteraConDatos : 0
+      };
+      totCartTotal += a.carteraTotal; totCartConDatos += a.carteraConDatos;
+      totDa += a.daNum; totMora += a.moraNum; totSeg += a.segNum;
     });
-    if (totCart > 0) {
-      DIV_SERIES[m]['TOTAL'] = { cartera: Math.round(totCart), da_pct: totDa / totCart, mora_pct: totMora / totCart, seg_pct: totSeg / totCart };
+    if (totCartTotal > 0) {
+      DIV_SERIES[m]['TOTAL'] = {
+        cartera: Math.round(totCartTotal),
+        da_pct: totCartConDatos ? totDa / totCartConDatos : 0,
+        mora_pct: totCartConDatos ? totMora / totCartConDatos : 0,
+        seg_pct: totCartConDatos ? totSeg / totCartConDatos : 0
+      };
     }
   });
 
@@ -884,11 +908,12 @@ function applyFetchedData(raw) {
   const currentOffices = {};
   const prevOfficesLocal = {};
   Object.entries(offices).forEach(([codigo, o]) => {
-    if (o.series[lastMonth]) {
-      const v = o.series[lastMonth];
+    const v = o.series[lastMonth];
+    if (v && v.da !== null && v.mora !== null && v.seg !== null) {
       currentOffices[codigo] = { div: o.div, filial: o.name, cartera: v.cartera, da: v.da, mora: v.mora, seg: v.seg };
     }
-    if (prevMonth && o.series[prevMonth]) prevOfficesLocal[codigo] = { mora: o.series[prevMonth].mora };
+    const pv = prevMonth ? o.series[prevMonth] : null;
+    if (pv && pv.mora !== null) prevOfficesLocal[codigo] = { mora: pv.mora };
   });
   const divTotalsLast = {};
   if (DIV_SERIES[lastMonth]) {
