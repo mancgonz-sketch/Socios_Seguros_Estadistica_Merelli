@@ -667,19 +667,60 @@ function shortName(n) {
     .split(' ').map(w => w.length ? w[0].toUpperCase()+w.slice(1).toLowerCase() : w).join(' ');
 }
 
+function findHeaderColumns(rows) {
+  // busca, en las primeras 10 filas, la fila que tenga los encabezados clave, y devuelve el índice (0-based) de cada columna
+  const wants = {
+    div: ['divisional'],
+    filial: ['filial'],
+    codigo: ['cr', 'codigo', 'código', 'nro'],
+    cartera: ['cartera total'],
+    cotiz: ['total socios cotizantes', 'cartera total socios cotizantes', 'socios cotizantes'],
+    da: ['cartera da %', 'da %', 'da%'],
+    mora: ['% morosos'],
+    seg: ['% socios seguro', 'socios seguro sobre cartera']
+  };
+  for (let ri = 0; ri < Math.min(10, rows.length); ri++) {
+    const row = rows[ri];
+    if (!row) continue;
+    const found = {};
+    row.forEach((cell, ci) => {
+      if (typeof cell !== 'string') return;
+      const norm = cell.toLowerCase().trim();
+      Object.entries(wants).forEach(([key, patterns]) => {
+        if (found[key] !== undefined) return; // ya encontrado, no pisar con un match peor
+        if (patterns.some(p => norm.includes(p))) found[key] = ci;
+      });
+    });
+    // con cartera, da, mora y seg encontrados alcanza para confiar en esta fila como header
+    if (found.cartera !== undefined && found.da !== undefined && found.mora !== undefined && found.seg !== undefined) {
+      return { headerRow: ri, cols: found };
+    }
+  }
+  return null;
+}
+
 function parseWorkbookRows(rows) {
+  const detected = findHeaderColumns(rows);
+  if (!detected) return { offices: {}, divTotals: {} };
+  const { headerRow, cols } = detected;
+  const idxDiv = cols.div !== undefined ? cols.div : 0;
+  const idxFilial = cols.filial !== undefined ? cols.filial : 1;
+  const idxCodigo = cols.codigo !== undefined ? cols.codigo : 2;
+  const idxCartera = cols.cartera, idxDa = cols.da, idxMora = cols.mora, idxSeg = cols.seg;
+
   let currentDivLocal = null;
   const offices = {};
   const divTotals = {};
-  for (const r of rows) {
+  for (let ri = headerRow + 1; ri < rows.length; ri++) {
+    const r = rows[ri];
     if (!r || r.length === 0) continue;
-    const c1 = r[0], c2 = r[1], c3 = r[2];
+    const c1 = r[idxDiv], c2 = r[idxFilial], c3 = r[idxCodigo];
     if (typeof c1 === 'string' && c1.trim() && !c1.trim().toUpperCase().startsWith('TOTAL')) {
       currentDivLocal = c1.trim().toUpperCase();
     }
     if (typeof c1 === 'string' && c1.trim().toUpperCase().startsWith('TOTAL')) {
       const divName = c1.trim().replace(/total/i,'').trim().toUpperCase();
-      const cartera = r[3], da = r[9], mora = r[13], seg = r[20];
+      const cartera = r[idxCartera], da = r[idxDa], mora = r[idxMora], seg = r[idxSeg];
       if (typeof cartera === 'number') {
         divTotals[divName || 'TOTAL'] = { cartera, da: da*100, mora: mora*100, seg: seg*100 };
       }
@@ -687,7 +728,7 @@ function parseWorkbookRows(rows) {
     }
     if (c2 == null || c3 == null) continue;
     if (typeof c2 === 'string' && c2.toUpperCase().includes('TOTAL')) continue;
-    const cartera = r[3], da = r[9], mora = r[13], seg = r[20];
+    const cartera = r[idxCartera], da = r[idxDa], mora = r[idxMora], seg = r[idxSeg];
     if (typeof cartera !== 'number' || typeof da !== 'number' || typeof mora !== 'number' || typeof seg !== 'number') continue;
     offices[String(c3)] = { div: currentDivLocal, filial: String(c2), cartera, da, mora, seg };
   }
