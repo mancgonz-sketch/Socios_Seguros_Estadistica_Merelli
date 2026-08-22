@@ -139,7 +139,7 @@
 </div>
 
 <header>
-  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.5</span></div>
+  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.6</span></div>
   <h1 id="pageTitle">Cartera y Cobranzas — Nacional</h1>
   <p id="headerSub">Evolución de cartera de socios, por gerencia divisional u oficina individual — más la situación actual de débito, mora y seguro.</p>
   <div class="tabs">
@@ -202,7 +202,9 @@
         <option value="TODAS">Todas las gerencias</option>
       </select>
       <span id="shareHint" style="font-size:11.5px;color:var(--muted);">Elegí tu gerencia para ver y compartir solo tus oficinas.</span>
+      <button class="btn-reset" id="btnExportStatic" style="margin-left:auto;background:var(--navy);color:white;">📤 Exportar HTML para compartir</button>
     </div>
+    <div id="exportStatus" style="font-size:11.5px;margin-bottom:10px;"></div>
 
     <div class="section-title">Comparativa Nacional — Gerencias Divisionales</div>
     <div id="comparativaApp"></div>
@@ -260,7 +262,7 @@
 <footer>
   <span id="footerCartera">Evolución de cartera: cargando...</span>
   Cobranzas: se muestra el mes más nuevo guardado en tu planilla de Google Sheets, comparado contra el mes anterior guardado.
-  <br>Versión 1.5 — las oficinas chicas sin dato de mora/débito/seguro (celda vacía en el origen) ya no se descartan del todo: se toman como 0% en esa columna puntual, para que la cartera total cierre exacto contra el archivo.
+  <br>Versión 1.6 — agrega "Exportar HTML para compartir": genera una foto estática (sin conexión a tu planilla ni candado) para mandarle a cualquiera.
 </footer>
 
 <script>
@@ -649,6 +651,53 @@ document.getElementById('btnReset').addEventListener('click', () => {
   document.getElementById('fileCurrent').value = '';
   document.getElementById('filePrev').value = '';
   loadFromAppsScript();
+});
+
+/* ---- Exportar HTML congelado (foto de este momento, sin conexión a Sheets) ---- */
+document.getElementById('btnExportStatic').addEventListener('click', () => {
+  const statusEl = document.getElementById('exportStatus');
+  try {
+    let html = document.documentElement.outerHTML;
+    const escapeForJs = (obj) => JSON.stringify(obj).replace(/</g, '\u003c');
+
+    html = html.replace('let DIV_SERIES = {};', 'let DIV_SERIES = ' + escapeForJs(DIV_SERIES) + ';');
+    html = html.replace('let OFFICE_HISTORY = {"months": [], "offices": {}};', 'let OFFICE_HISTORY = ' + escapeForJs(OFFICE_HISTORY) + ';');
+    html = html.replace('let COBRANZAS_DEFAULT = [];', 'let COBRANZAS_DEFAULT = ' + escapeForJs(lastOficinas) + ';');
+    html = html.replace('let COMPARATIVA_DEFAULT = [];', 'let COMPARATIVA_DEFAULT = ' + escapeForJs(lastComparativa) + ';');
+    // desconectar la copia exportada de tu Apps Script: quien la reciba solo ve esta foto, no tu planilla en vivo
+    html = html.replace(/const APPS_SCRIPT_URL = '[^']*';/, "const APPS_SCRIPT_URL = '';");
+    // renderizar directo al abrir, sin depender de ningún candado ni carga remota
+    html = html.replace(/<\/script>\s*<\/body>/, `
+document.getElementById('btnExportStatic').remove();
+document.getElementById('exportStatus').remove();
+rebuildOfficesByDiv();
+populateOficinaPicker(currentDiv);
+renderCartera();
+renderComparativa(COMPARATIVA_DEFAULT);
+renderOficinas(COBRANZAS_DEFAULT);
+<\/script>
+<\/body>`);
+    // marcar en el título que es una foto estática, no la herramienta en vivo
+    html = html.replace('<title>Cartera y Cobranzas — ACA Nacional</title>', '<title>Cartera y Cobranzas — ACA Nacional (foto estática)</title>');
+    html = html.replace('· v', '· 📷 solo lectura · v');
+
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fecha = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = `cartera_cobranzas_foto_${fecha}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    statusEl.textContent = 'Listo — se descargó un HTML de solo lectura con los datos de este momento (' + MONTHS[MONTHS.length-1] + '). No se conecta a tu planilla ni pide código de acceso.';
+    statusEl.className = 'upload-status ok';
+  } catch (err) {
+    statusEl.textContent = 'No pude generar el archivo: ' + err.message;
+    statusEl.className = 'upload-status err';
+  }
 });
 
 /* ---- Datos de muestra (ficticios), para demostrar la herramienta sin usar el archivo real ---- */
