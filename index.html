@@ -139,7 +139,7 @@
 </div>
 
 <header>
-  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.2</span></div>
+  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.5</span></div>
   <h1 id="pageTitle">Cartera y Cobranzas — Nacional</h1>
   <p id="headerSub">Evolución de cartera de socios, por gerencia divisional u oficina individual — más la situación actual de débito, mora y seguro.</p>
   <div class="tabs">
@@ -184,6 +184,13 @@
       <h3>% Socios con Seguro</h3>
       <div class="sub" id="subSeguro">Enero 2025 — Junio 2026</div>
       <div class="chartbox"><canvas id="chartSeguro"></canvas></div>
+    </div>
+
+    <div class="card">
+      <h3>Socios con Seguro (cantidad)</h3>
+      <div class="sub" id="subSeguroCant">Enero 2025 — Junio 2026</div>
+      <div class="chartbox"><canvas id="chartSeguroCantidad"></canvas></div>
+      <div class="note">Cantidad de socios con seguro = cartera × % seguro de ese mes.</div>
     </div>
   </div>
 
@@ -253,7 +260,7 @@
 <footer>
   <span id="footerCartera">Evolución de cartera: cargando...</span>
   Cobranzas: se muestra el mes más nuevo guardado en tu planilla de Google Sheets, comparado contra el mes anterior guardado.
-  <br>Versión 1.2 — corrige escala de %Débito/%Mora/%Seguro por oficina (antes quedaban divididos por 100 de más) y agrega cotizante/vitalicio a la carga de un solo mes.
+  <br>Versión 1.5 — las oficinas chicas sin dato de mora/débito/seguro (celda vacía en el origen) ya no se descartan del todo: se toman como 0% en esa columna puntual, para que la cartera total cierre exacto contra el archivo.
 </footer>
 
 <script>
@@ -269,7 +276,7 @@ let MONTHS = Object.keys(DIV_SERIES);
 let mode = 'gerencia';
 let currentDiv = 'NEUQUEN';
 let currentOfficeCodigo = null;
-let chartCartera, chartDaMora, chartSeguro;
+let chartCartera, chartDaMora, chartSeguro, chartSeguroCantidad;
 
 document.querySelectorAll('.tab').forEach(t => {
   t.addEventListener('click', () => {
@@ -400,6 +407,7 @@ function renderCartera() {
     document.getElementById('subCartera').textContent = rango;
     document.getElementById('subDaMora').textContent = rango;
     document.getElementById('subSeguro').textContent = rango;
+    document.getElementById('subSeguroCant').textContent = rango;
     document.getElementById('headerSub').textContent = `Evolución de cartera de socios, ${rango}, por gerencia divisional u oficina individual — más la situación actual de débito, mora y seguro.`;
     document.getElementById('footerCartera').textContent = `Evolución de cartera: ${rango}, por gerencia u oficina (${Object.keys(OFFICE_HISTORY.offices).length} oficinas cargadas).`;
   }
@@ -454,6 +462,15 @@ function renderCartera() {
     data: { labels: MONTHS, datasets: [{ label: '% Seguro', data: segData, borderColor: '#d4a017', backgroundColor: 'rgba(212,160,23,0.1)', borderWidth: 2, pointRadius: 3, tension: 0.25, fill: true, spanGaps: true }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
       scales: { x: { ticks: { color: '#8a96a3', font: { size: 9 }, maxRotation: 45 }, grid: { display: false } }, y: { beginAtZero: false, ticks: { color: '#8a96a3', callback: v => v.toFixed(1) + '%' }, grid: { color: '#e5e9ee' } } } }
+  });
+
+  const seguroCantData = seriesArr.map(v => (v && v.cartera != null && v.seg != null) ? Math.round(v.cartera * v.seg / 100) : null);
+  if (chartSeguroCantidad) chartSeguroCantidad.destroy();
+  chartSeguroCantidad = new Chart(document.getElementById('chartSeguroCantidad'), {
+    type: 'line',
+    data: { labels: MONTHS, datasets: [{ label: 'Socios con seguro', data: seguroCantData, borderColor: '#0d2c4e', backgroundColor: 'rgba(13,44,78,0.08)', borderWidth: 2, pointRadius: 3, tension: 0.25, fill: true, spanGaps: true }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#8a96a3', font: { size: 9 }, maxRotation: 45 }, grid: { display: false } }, y: { beginAtZero: false, ticks: { color: '#8a96a3' }, grid: { color: '#e5e9ee' } } } }
   });
 }
 
@@ -519,13 +536,18 @@ function renderComparativa(rows) {
   lastComparativa = rows;
   const app = document.getElementById('comparativaApp');
   const filtered = gerenciaFilter === 'TODAS' ? rows : rows.filter(r => r.key === gerenciaFilter);
+  const deltaSpan = (d) => {
+    if (d === null || d === undefined) return '';
+    const s = d >= 0 ? '+' : '';
+    return `<div style="font-size:9.5px;color:var(--muted);margin-top:1px;">${s}${d.toFixed(1)}pp vs mes ant.</div>`;
+  };
   let html = '<table class="comp"><tr><th>Gerencia</th><th>Cartera</th><th>% Débito</th><th>% Mora</th><th>% Seguro</th></tr>';
   filtered.forEach(r => {
     const cls = r.key === 'TOTAL' ? 'hl' : '';
     html += `<tr class="${cls}"><td>${r.label}</td><td>${r.cartera.toLocaleString('es-AR')}</td>
-      <td><span class="cell ${classDA(r.da)}">${r.da.toFixed(1)}%</span></td>
-      <td><span class="cell ${classMora(r.mora)}">${r.mora.toFixed(1)}%</span></td>
-      <td><span class="cell ${classSeg(r.seg)}">${r.seg.toFixed(1)}%</span></td></tr>`;
+      <td><span class="cell ${classDA(r.da)}">${r.da.toFixed(1)}%</span>${deltaSpan(r.daDelta)}</td>
+      <td><span class="cell ${classMora(r.mora)}">${r.mora.toFixed(1)}%</span>${deltaSpan(r.moraDelta)}</td>
+      <td><span class="cell ${classSeg(r.seg)}">${r.seg.toFixed(1)}%</span>${deltaSpan(r.segDelta)}</td></tr>`;
   });
   html += '</table>';
   app.innerHTML = html;
@@ -750,8 +772,13 @@ function parseWorkbookRows(rows) {
     }
     if (c2 == null || c3 == null) continue;
     if (typeof c2 === 'string' && c2.toUpperCase().includes('TOTAL')) continue;
-    const cartera = r[idxCartera], da = r[idxDa], mora = r[idxMora], seg = r[idxSeg];
-    if (typeof cartera !== 'number' || typeof da !== 'number' || typeof mora !== 'number' || typeof seg !== 'number') continue;
+    const cartera = r[idxCartera];
+    if (typeof cartera !== 'number') continue;
+    // si a una oficina chica le falta %DA/%Mora/%Seguro (celda vacía en el origen, normalmente porque
+    // no hubo casos ese mes), se toma como 0% en vez de descartar la oficina entera.
+    const da = typeof r[idxDa] === 'number' ? r[idxDa] : 0;
+    const mora = typeof r[idxMora] === 'number' ? r[idxMora] : 0;
+    const seg = typeof r[idxSeg] === 'number' ? r[idxSeg] : 0;
     let cotizante = null, vitalicio = null;
     if (idxCotiz !== undefined && typeof r[idxCotiz] === 'number') {
       cotizante = r[idxCotiz];
@@ -771,15 +798,24 @@ async function readWorkbook(file) {
   return parseWorkbookRows(rows);
 }
 
-function buildComparativaFromTotals(divTotals) {
+function buildComparativaFromTotals(divTotals, prevDivTotals) {
   const order = ['TUCUMAN','TRELEW','ROSARIO','CORDOBA','NEUQUEN','CAPITAL','MAR DEL PLATA'];
+  function findGeneralKey(dt) {
+    return dt ? Object.keys(dt).find(k => k.includes('GENERAL') || k === 'TOTAL' || k === '') : undefined;
+  }
+  function deltasFor(prev, cur) {
+    if (!prev) return { daDelta: null, moraDelta: null, segDelta: null };
+    return { daDelta: cur.da - prev.da, moraDelta: cur.mora - prev.mora, segDelta: cur.seg - prev.seg };
+  }
   const rows = [];
   order.forEach(k => {
-    if (divTotals[k]) rows.push({ key:k, label: DIV_LABELS[k] || k, cartera: Math.round(divTotals[k].cartera), da: divTotals[k].da, mora: divTotals[k].mora, seg: divTotals[k].seg });
+    if (divTotals[k]) rows.push({ key:k, label: DIV_LABELS[k] || k, cartera: Math.round(divTotals[k].cartera), da: divTotals[k].da, mora: divTotals[k].mora, seg: divTotals[k].seg, ...deltasFor(prevDivTotals && prevDivTotals[k], divTotals[k]) });
   });
-  const generalKey = Object.keys(divTotals).find(k => k.includes('GENERAL') || k === 'TOTAL' || k === '');
+  const generalKey = findGeneralKey(divTotals);
   if (generalKey !== undefined && divTotals[generalKey]) {
-    rows.push({ key:'TOTAL', label:'Total País', cartera: Math.round(divTotals[generalKey].cartera), da: divTotals[generalKey].da, mora: divTotals[generalKey].mora, seg: divTotals[generalKey].seg });
+    const prevGeneralKey = findGeneralKey(prevDivTotals);
+    const prevGeneral = prevDivTotals && prevGeneralKey !== undefined ? prevDivTotals[prevGeneralKey] : null;
+    rows.push({ key:'TOTAL', label:'Total País', cartera: Math.round(divTotals[generalKey].cartera), da: divTotals[generalKey].da, mora: divTotals[generalKey].mora, seg: divTotals[generalKey].seg, ...deltasFor(prevGeneral, divTotals[generalKey]) });
   }
   return rows;
 }
@@ -1025,9 +1061,15 @@ function applyFetchedData(raw) {
       divTotalsLast[d] = { cartera: v.cartera, da: v.da_pct * 100, mora: v.mora_pct * 100, seg: v.seg_pct * 100 };
     });
   }
+  const divTotalsPrev = {};
+  if (prevMonth && DIV_SERIES[prevMonth]) {
+    Object.entries(DIV_SERIES[prevMonth]).forEach(([d, v]) => {
+      divTotalsPrev[d] = { cartera: v.cartera, da: v.da_pct * 100, mora: v.mora_pct * 100, seg: v.seg_pct * 100 };
+    });
+  }
 
   prevOfficesData = prevMonth ? prevOfficesLocal : null;
-  const comp = buildComparativaFromTotals(divTotalsLast);
+  const comp = buildComparativaFromTotals(divTotalsLast, prevMonth ? divTotalsPrev : null);
   const groups = buildOficinasFromParsed({ offices: currentOffices }, prevOfficesData);
   COMPARATIVA_DEFAULT = comp;
   COBRANZAS_DEFAULT = groups;
