@@ -139,9 +139,9 @@
 </div>
 
 <header>
-  <div class="eyebrow">ACA · Producción de Socios y Seguros</div>
+  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.1</span></div>
   <h1 id="pageTitle">Cartera y Cobranzas — Nacional</h1>
-  <p>Evolución de cartera de socios, enero 2025 a junio 2026, por gerencia divisional u oficina individual — más la situación actual de débito, mora y seguro.</p>
+  <p id="headerSub">Evolución de cartera de socios, por gerencia divisional u oficina individual — más la situación actual de débito, mora y seguro.</p>
   <div class="tabs">
     <div class="tab active" data-tab="cartera">Evolución de Cartera</div>
     <div class="tab" data-tab="cobranzas">Situación de Cobranzas</div>
@@ -168,7 +168,7 @@
 
     <div class="card">
       <h3>Cartera de Socios (cantidad)</h3>
-      <div class="sub">Enero 2025 — Junio 2026</div>
+      <div class="sub" id="subCartera">Enero 2025 — Junio 2026</div>
       <div class="chartbox"><canvas id="chartCartera"></canvas></div>
       <div class="note">La línea es la cartera total (cotizante + vitalicio). El detalle mes a mes está en la tabla de abajo.</div>
       <div id="carteraTablaWrap" style="margin-top:16px;"></div>
@@ -176,13 +176,13 @@
 
     <div class="card">
       <h3>% Débito Automático y % Mora +3 meses</h3>
-      <div class="sub">Enero 2025 — Junio 2026</div>
+      <div class="sub" id="subDaMora">Enero 2025 — Junio 2026</div>
       <div class="chartbox"><canvas id="chartDaMora"></canvas></div>
     </div>
 
     <div class="card">
       <h3>% Socios con Seguro</h3>
-      <div class="sub">Enero 2025 — Junio 2026</div>
+      <div class="sub" id="subSeguro">Enero 2025 — Junio 2026</div>
       <div class="chartbox"><canvas id="chartSeguro"></canvas></div>
     </div>
   </div>
@@ -251,8 +251,9 @@
 </main>
 
 <footer>
-  Evolución de cartera: enero 2025 a junio 2026, por gerencia u oficina (135 oficinas con hasta 18 meses de historia cada una).
+  <span id="footerCartera">Evolución de cartera: cargando...</span>
   Cobranzas: se muestra el mes más nuevo guardado en tu planilla de Google Sheets, comparado contra el mes anterior guardado.
+  <br>Versión 1.1 — lector de columnas por nombre de encabezado (se adapta si Carlos vuelve a mover columnas).
 </footer>
 
 <script>
@@ -363,24 +364,45 @@ function getSeriesForCurrentSelection() {
 
 function renderKpis(seriesArr) {
   const valid = seriesArr.map((v,i) => v ? {v,i} : null).filter(Boolean);
-  if (valid.length < 2) { document.getElementById('kpis').innerHTML = '<div class="kpi"><div class="lbl">Sin datos suficientes</div></div>'; return; }
-  const first = valid[0].v, last = valid[valid.length-1].v;
-  const cartVar = first.cartera ? (last.cartera/first.cartera - 1) * 100 : 0;
-  const daDelta = last.da - first.da;
-  const moraDelta = last.mora - first.mora;
-  const segDelta = last.seg - first.seg;
+  if (valid.length < 1) { document.getElementById('kpis').innerHTML = '<div class="kpi"><div class="lbl">Sin datos suficientes</div></div>'; return; }
+  const last = valid[valid.length-1].v;
+  const mesActual = MONTHS[valid[valid.length-1].i];
+  const prev = valid.length >= 2 ? valid[valid.length-2].v : null;
+
+  const cartVar = prev && prev.cartera ? (last.cartera/prev.cartera - 1) * 100 : null;
+  const cartAbs = prev ? last.cartera - prev.cartera : null;
+  const daDelta = prev ? last.da - prev.da : null;
+  const moraDelta = prev ? last.mora - prev.mora : null;
+  const segDelta = prev ? last.seg - prev.seg : null;
+
+  function deltaLine(delta, isPct, favorableWhenUp) {
+    if (delta === null) return '<span style="color:var(--muted);">sin mes anterior</span>';
+    const up = favorableWhenUp ? delta >= 0 : delta <= 0;
+    const sign = delta >= 0 ? '+' : '';
+    return `<span class="${up?'up':'down'}">${sign}${delta.toFixed(1)}${isPct?'%':'pp'}</span> <span style="font-size:10px;color:var(--muted);">vs mes ant.</span>`;
+  }
+
   const kpisEl = document.getElementById('kpis');
   kpisEl.innerHTML = `
-    <div class="kpi"><div class="lbl">Cartera actual</div><div class="val">${fmtInt(last.cartera)}</div><div class="delta ${cartVar>=0?'up':'down'}">${cartVar>=0?'+':''}${cartVar.toFixed(1)}% en el período</div></div>
-    <div class="kpi"><div class="lbl">% Débito</div><div class="val">${fmtPct(last.da)}</div><div class="delta ${daDelta>=0?'up':'down'}">${daDelta>=0?'+':''}${daDelta.toFixed(1)}pp</div></div>
-    <div class="kpi"><div class="lbl">% Mora +3m</div><div class="val">${fmtPct(last.mora)}</div><div class="delta ${moraDelta<=0?'up':'down'}">${moraDelta>=0?'+':''}${moraDelta.toFixed(1)}pp</div></div>
-    <div class="kpi"><div class="lbl">% Seguro</div><div class="val">${fmtPct(last.seg)}</div><div class="delta ${segDelta>=0?'up':'down'}">${segDelta>=0?'+':''}${segDelta.toFixed(1)}pp</div></div>
+    <div class="kpi"><div class="lbl">Cartera — ${mesActual}</div><div class="val">${fmtInt(last.cartera)}</div><div class="delta">${deltaLine(cartVar, true, true)}${cartAbs !== null ? ` <span style="font-size:10px;color:var(--muted);">(${cartAbs>=0?'+':''}${fmtInt(cartAbs)})</span>` : ''}</div></div>
+    <div class="kpi"><div class="lbl">% Débito — ${mesActual}</div><div class="val">${fmtPct(last.da)}</div><div class="delta">${deltaLine(daDelta, false, true)}</div></div>
+    <div class="kpi"><div class="lbl">% Mora +3m — ${mesActual}</div><div class="val">${fmtPct(last.mora)}</div><div class="delta">${deltaLine(moraDelta, false, false)}</div></div>
+    <div class="kpi"><div class="lbl">% Seguro — ${mesActual}</div><div class="val">${fmtPct(last.seg)}</div><div class="delta">${deltaLine(segDelta, false, true)}</div></div>
   `;
 }
 
 function renderCartera() {
   document.querySelectorAll('.divchip').forEach(c => c.classList.toggle('active', c.dataset.div === currentDiv));
   const seriesArr = getSeriesForCurrentSelection();
+
+  if (MONTHS.length) {
+    const rango = MONTHS.length > 1 ? `${MONTHS[0]} — ${MONTHS[MONTHS.length-1]}` : MONTHS[0];
+    document.getElementById('subCartera').textContent = rango;
+    document.getElementById('subDaMora').textContent = rango;
+    document.getElementById('subSeguro').textContent = rango;
+    document.getElementById('headerSub').textContent = `Evolución de cartera de socios, ${rango}, por gerencia divisional u oficina individual — más la situación actual de débito, mora y seguro.`;
+    document.getElementById('footerCartera').textContent = `Evolución de cartera: ${rango}, por gerencia u oficina (${Object.keys(OFFICE_HISTORY.offices).length} oficinas cargadas).`;
+  }
 
   let title = 'Cartera y Cobranzas — ';
   if (mode === 'gerencia') {
@@ -730,7 +752,7 @@ function parseWorkbookRows(rows) {
     if (typeof c2 === 'string' && c2.toUpperCase().includes('TOTAL')) continue;
     const cartera = r[idxCartera], da = r[idxDa], mora = r[idxMora], seg = r[idxSeg];
     if (typeof cartera !== 'number' || typeof da !== 'number' || typeof mora !== 'number' || typeof seg !== 'number') continue;
-    offices[String(c3)] = { div: currentDivLocal, filial: String(c2), cartera, da, mora, seg };
+    offices[String(c3)] = { div: currentDivLocal, filial: String(c2), cartera, da: da*100, mora: mora*100, seg: seg*100 };
   }
   return { offices, divTotals };
 }
