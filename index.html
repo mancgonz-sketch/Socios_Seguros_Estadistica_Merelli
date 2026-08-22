@@ -139,7 +139,7 @@
 </div>
 
 <header>
-  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.1</span></div>
+  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.2</span></div>
   <h1 id="pageTitle">Cartera y Cobranzas — Nacional</h1>
   <p id="headerSub">Evolución de cartera de socios, por gerencia divisional u oficina individual — más la situación actual de débito, mora y seguro.</p>
   <div class="tabs">
@@ -253,7 +253,7 @@
 <footer>
   <span id="footerCartera">Evolución de cartera: cargando...</span>
   Cobranzas: se muestra el mes más nuevo guardado en tu planilla de Google Sheets, comparado contra el mes anterior guardado.
-  <br>Versión 1.1 — lector de columnas por nombre de encabezado (se adapta si Carlos vuelve a mover columnas).
+  <br>Versión 1.2 — corrige escala de %Débito/%Mora/%Seguro por oficina (antes quedaban divididos por 100 de más) y agrega cotizante/vitalicio a la carga de un solo mes.
 </footer>
 
 <script>
@@ -728,7 +728,7 @@ function parseWorkbookRows(rows) {
   const idxDiv = cols.div !== undefined ? cols.div : 0;
   const idxFilial = cols.filial !== undefined ? cols.filial : 1;
   const idxCodigo = cols.codigo !== undefined ? cols.codigo : 2;
-  const idxCartera = cols.cartera, idxDa = cols.da, idxMora = cols.mora, idxSeg = cols.seg;
+  const idxCartera = cols.cartera, idxDa = cols.da, idxMora = cols.mora, idxSeg = cols.seg, idxCotiz = cols.cotiz;
 
   let currentDivLocal = null;
   const offices = {};
@@ -752,7 +752,12 @@ function parseWorkbookRows(rows) {
     if (typeof c2 === 'string' && c2.toUpperCase().includes('TOTAL')) continue;
     const cartera = r[idxCartera], da = r[idxDa], mora = r[idxMora], seg = r[idxSeg];
     if (typeof cartera !== 'number' || typeof da !== 'number' || typeof mora !== 'number' || typeof seg !== 'number') continue;
-    offices[String(c3)] = { div: currentDivLocal, filial: String(c2), cartera, da: da*100, mora: mora*100, seg: seg*100 };
+    let cotizante = null, vitalicio = null;
+    if (idxCotiz !== undefined && typeof r[idxCotiz] === 'number') {
+      cotizante = r[idxCotiz];
+      vitalicio = cartera - cotizante;
+    }
+    offices[String(c3)] = { div: currentDivLocal, filial: String(c2), cartera, da: da*100, mora: mora*100, seg: seg*100, cotizante, vitalicio };
   }
   return { offices, divTotals };
 }
@@ -1043,7 +1048,7 @@ document.getElementById('btnSaveToSheet').addEventListener('click', async () => 
   if (!month) { statusEl.textContent = 'Poné una etiqueta de mes (ej: Jul-26).'; statusEl.className='upload-status err'; return; }
   statusEl.textContent = 'Guardando...'; statusEl.className = 'upload-status';
   try {
-    const officesArr = Object.entries(lastParsedForSheet.offices).map(([codigo,o]) => ({codigo, filial:o.filial, div:o.div, cartera:o.cartera, da:o.da, mora:o.mora, seg:o.seg}));
+    const officesArr = Object.entries(lastParsedForSheet.offices).map(([codigo,o]) => ({codigo, filial:o.filial, div:o.div, cartera:o.cartera, da:o.da, mora:o.mora, seg:o.seg, vitalicio:o.vitalicio, cotizante:o.cotizante}));
     const res = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
       body: JSON.stringify({ action:'saveMonth', token: sessionToken, month, offices: officesArr, divTotals: lastParsedForSheet.divTotals })
