@@ -139,7 +139,7 @@
 </div>
 
 <header>
-  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.8</span></div>
+  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.9</span></div>
   <h1 id="pageTitle">Cartera y Cobranzas — Nacional</h1>
   <p id="headerSub">Evolución de cartera de socios, por gerencia divisional u oficina individual — más la situación actual de débito, mora y seguro.</p>
   <div class="tabs">
@@ -270,7 +270,7 @@
 <footer>
   <span id="footerCartera">Evolución de cartera: cargando...</span>
   Cobranzas: se muestra el mes más nuevo guardado en tu planilla de Google Sheets, comparado contra el mes anterior guardado.
-  <br>Versión 1.8 — el export siempre incluye todas las gerencias/oficinas (para que se puedan elegir en el archivo exportado), y los botones de exportar se movieron a la pestaña "Cargar Archivo".
+  <br>Versión 1.9 — corrige duplicación de opciones (gerencias/oficinas) cuando el HTML exportado se abre y el script corre de nuevo sobre contenido ya generado.
 </footer>
 
 <script>
@@ -310,6 +310,7 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
 });
 
 const chipsEl = document.getElementById('divChips');
+chipsEl.innerHTML = ''; // por si el script corre más de una vez (ej: archivo exportado), no duplicar
 DIV_ORDER.forEach(d => {
   const chip = document.createElement('div');
   chip.className = 'divchip' + (d === currentDiv ? ' active' : '');
@@ -333,6 +334,7 @@ rebuildOfficesByDiv();
 
 const pickerGerencia = document.getElementById('pickerGerencia');
 const pickerOficina = document.getElementById('pickerOficina');
+pickerGerencia.innerHTML = ''; // idem, evitar duplicar si el script corre dos veces
 DIV_ORDER.filter(d => d !== 'TOTAL').forEach(d => {
   const opt = document.createElement('option');
   opt.value = d; opt.textContent = DIV_LABELS[d];
@@ -528,6 +530,7 @@ let lastOficinas = COBRANZAS_DEFAULT;
 let gerenciaFilter = 'TODAS';
 
 const pickerGerenciaCobranzas = document.getElementById('pickerGerenciaCobranzas');
+pickerGerenciaCobranzas.innerHTML = '<option value="TODAS">Todas las gerencias</option>'; // reset, evita duplicar si el script corre dos veces
 DIV_ORDER.filter(d => d !== 'TOTAL').forEach(d => {
   const opt = document.createElement('option');
   opt.value = d; opt.textContent = DIV_LABELS[d];
