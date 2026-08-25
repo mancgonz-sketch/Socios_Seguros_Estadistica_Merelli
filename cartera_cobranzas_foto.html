@@ -129,9 +129,8 @@
       <div class="lock-card">
         <div class="lock-icon">🔒</div>
         <h2>Cartera y Cobranzas — ACA</h2>
-        <p>Ingresá tu número de matrícula y el código de acceso que te compartió tu Gerencia Divisional.</p>
-        <input type="text" id="matriculaInput" placeholder="Tu número de matrícula" autocomplete="off" style="margin-bottom:10px;" inputmode="numeric">
-        <input type="password" id="lockInput" placeholder="Código de acceso" autocomplete="off">
+        <p>Ingresá tu número de matrícula para entrar.</p>
+        <input type="text" id="matriculaInput" placeholder="Tu número de matrícula" autocomplete="off" inputmode="numeric">
         <button id="lockBtn">Entrar</button>
         <div class="lock-error" id="lockError"></div>
       </div></div><div id="rss-app"></div>
@@ -139,7 +138,7 @@
 
 
 <header>
-  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· 📷 solo lectura · v1.16</span></div>
+  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· 📷 solo lectura · v1.17</span></div>
   <h1 id="pageTitle">Cartera y Cobranzas — Neuquén</h1>
   <p id="headerSub">Evolución de cartera de socios, Ene-25 — Jul-26, por gerencia divisional u oficina individual — más la situación actual de débito, mora y seguro.</p>
   <div class="tabs">
@@ -174,7 +173,7 @@
     <div class="card">
       <h3>Cartera de Socios (cantidad)</h3>
       <div class="sub" id="subCartera">Ene-25 — Jul-26</div>
-      <div class="chartbox"><canvas id="chartCartera" height="0" style="display: block; box-sizing: border-box; height: 0px; width: 0px;" width="0"></canvas></div>
+      <div class="chartbox"><canvas id="chartCartera" width="1426" height="420" style="display: block; box-sizing: border-box; height: 280px; width: 950px;"></canvas></div>
       <div class="note">La línea es la cartera total (cotizante + vitalicio). El detalle mes a mes está en la tabla de abajo.</div>
       <div id="carteraTablaWrap" style="margin-top:16px;"><div style="overflow-x:auto;"><table class="comp"><tbody><tr><th>Mes</th><th>Cotizante</th><th>Vitalicio</th><th>Total</th></tr><tr><td>Ene-25</td><td>7.190</td><td>904</td><td>8.094</td></tr><tr><td>Feb-25</td><td>7.535</td><td>907</td><td>8.442</td></tr><tr><td>Mar-25</td><td>7.901</td><td>906</td><td>8.807</td></tr><tr><td>Abr-25</td><td>8.273</td><td>908</td><td>9.181</td></tr><tr><td>May-25</td><td>8.650</td><td>909</td><td>9.559</td></tr><tr><td>Jun-25</td><td>9.001</td><td>911</td><td>9.912</td></tr><tr><td>Jul-25</td><td>9.399</td><td>912</td><td>10.311</td></tr><tr><td>Ago-25</td><td>9.861</td><td>913</td><td>10.774</td></tr><tr><td>Sep-25</td><td>10.254</td><td>912</td><td>11.166</td></tr><tr><td>Oct-25</td><td>10.470</td><td>911</td><td>11.381</td></tr><tr><td>Nov-25</td><td>10.574</td><td>910</td><td>11.484</td></tr><tr><td>Dic-25</td><td>10.745</td><td>910</td><td>11.655</td></tr><tr><td>Ene-26</td><td>10.988</td><td>911</td><td>11.899</td></tr><tr><td>Feb-26</td><td>11.100</td><td>909</td><td>12.009</td></tr><tr><td>Mar-26</td><td>11.206</td><td>909</td><td>12.115</td></tr><tr><td>Abr-26</td><td>11.340</td><td>909</td><td>12.249</td></tr><tr><td>May-26</td><td>11.356</td><td>892</td><td>12.248</td></tr><tr><td>Jun-26</td><td>11.468</td><td>892</td><td>12.360</td></tr><tr><td>Jul-26</td><td>11.538</td><td>858</td><td>12.396</td></tr></tbody></table></div></div>
     </div>
@@ -182,19 +181,19 @@
     <div class="card">
       <h3>% Débito Automático y % Mora +3 meses</h3>
       <div class="sub" id="subDaMora">Ene-25 — Jul-26</div>
-      <div class="chartbox"><canvas id="chartDaMora" height="0" style="display: block; box-sizing: border-box; height: 0px; width: 0px;" width="0"></canvas></div>
+      <div class="chartbox"><canvas id="chartDaMora" width="1426" height="420" style="display: block; box-sizing: border-box; height: 280px; width: 950px;"></canvas></div>
     </div>
 
     <div class="card">
       <h3>% Socios con Seguro</h3>
       <div class="sub" id="subSeguro">Ene-25 — Jul-26</div>
-      <div class="chartbox"><canvas id="chartSeguro" height="0" style="display: block; box-sizing: border-box; height: 0px; width: 0px;" width="0"></canvas></div>
+      <div class="chartbox"><canvas id="chartSeguro" width="1426" height="420" style="display: block; box-sizing: border-box; height: 280px; width: 950px;"></canvas></div>
     </div>
 
     <div class="card">
       <h3>Socios con Seguro (cantidad)</h3>
       <div class="sub" id="subSeguroCant">Ene-25 — Jul-26</div>
-      <div class="chartbox"><canvas id="chartSeguroCantidad" height="0" style="display: block; box-sizing: border-box; height: 0px; width: 0px;" width="0"></canvas></div>
+      <div class="chartbox"><canvas id="chartSeguroCantidad" width="1426" height="420" style="display: block; box-sizing: border-box; height: 280px; width: 950px;"></canvas></div>
       <div class="note">Cantidad de socios con seguro = cartera × % seguro de ese mes.</div>
     </div>
   </div>
@@ -278,7 +277,7 @@
 <footer>
   <span id="footerCartera">Evolución de cartera: Ene-25 — Jul-26, por gerencia u oficina (151 oficinas cargadas).</span>
   Cobranzas: se muestra el mes más nuevo guardado en tu planilla de Google Sheets, comparado contra el mes anterior guardado.
-  <br>Versión 1.16 — los archivos exportados ahora piden número de matrícula y lo validan contra una lista real (hoja "Matriculas" en tu planilla) en vez de aceptar cualquier nombre escrito a mano.
+  <br>Versión 1.17 — el login del archivo exportado ahora es solo con matrícula (sin código aparte), y el registro guarda también dependencia y gerencia de cada persona.
 </footer>
 
 <script>
@@ -707,9 +706,8 @@ function exportStaticHtml(onlyCobranzas) {
       <div class="lock-card">
         <div class="lock-icon">🔒</div>
         <h2>Cartera y Cobranzas — ACA</h2>
-        <p>Ingresá tu número de matrícula y el código de acceso que te compartió tu Gerencia Divisional.</p>
-        <input type="text" id="matriculaInput" placeholder="Tu número de matrícula" autocomplete="off" style="margin-bottom:10px;" inputmode="numeric">
-        <input type="password" id="lockInput" placeholder="Código de acceso" autocomplete="off">
+        <p>Ingresá tu número de matrícula para entrar.</p>
+        <input type="text" id="matriculaInput" placeholder="Tu número de matrícula" autocomplete="off" inputmode="numeric">
         <button id="lockBtn">Entrar</button>
         <div class="lock-error" id="lockError"></div>
       </div>`;
@@ -832,16 +830,16 @@ document.getElementById('btnLoadAccessLog')?.addEventListener('click', async () 
       const mat = String(r['Matrícula'] || '');
       const nombre = String(r['Nombre y Apellido'] || '(sin nombre)');
       const key = mat || nombre;
-      if (!porMatricula[key]) porMatricula[key] = { matricula: mat, nombre, count: 0, ultima: null, archivos: new Set() };
+      if (!porMatricula[key]) porMatricula[key] = { matricula: mat, nombre, dependencia: r['Dependencia'] || '', gerencia: r['Gerencia'] || '', count: 0, ultima: null, archivos: new Set() };
       porMatricula[key].count++;
       porMatricula[key].archivos.add(r['Archivo'] || '');
       const fecha = new Date(r['Fecha y hora']);
       if (!porMatricula[key].ultima || fecha > porMatricula[key].ultima) porMatricula[key].ultima = fecha;
     });
     const filas = Object.values(porMatricula).sort((a,b) => b.count - a.count);
-    let html = '<table class="comp"><tr><th>Matrícula</th><th>Nombre y Apellido</th><th>Accesos</th><th>Último acceso</th><th>Archivo(s)</th></tr>';
+    let html = '<table class="comp"><tr><th>Matrícula</th><th>Nombre y Apellido</th><th>Dependencia</th><th>Gerencia</th><th>Accesos</th><th>Último acceso</th><th>Archivo(s)</th></tr>';
     filas.forEach(info => {
-      html += `<tr><td>${info.matricula || '—'}</td><td>${info.nombre}</td><td>${info.count}</td><td>${info.ultima ? info.ultima.toLocaleString('es-AR') : '—'}</td><td>${[...info.archivos].join(', ')}</td></tr>`;
+      html += `<tr><td>${info.matricula || '—'}</td><td>${info.nombre}</td><td>${info.dependencia || '—'}</td><td>${info.gerencia || '—'}</td><td>${info.count}</td><td>${info.ultima ? info.ultima.toLocaleString('es-AR') : '—'}</td><td>${[...info.archivos].join(', ')}</td></tr>`;
     });
     html += '</table>';
     wrap.innerHTML = html;
@@ -1077,40 +1075,39 @@ if (savedToken && !scriptConfigured && savedToken === FALLBACK_TOKEN) {
 }
 
 document.getElementById('lockBtn').addEventListener('click', tryUnlock);
-document.getElementById('lockInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+document.getElementById('lockInput')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+document.getElementById('matriculaInput')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
 
 async function tryUnlock() {
-  const val = document.getElementById('lockInput').value.trim();
   const errEl = document.getElementById('lockError');
   errEl.textContent = '';
 
   const matriculaEl = document.getElementById('matriculaInput');
 
-  // archivos exportados: llevan campo de matrícula, y esa matrícula tiene que existir
-  // de verdad en tu planilla (hoja "Matriculas") además del código de acceso
+  // archivos exportados: solo piden matrícula, validada contra tu planilla (hoja "Matriculas")
   if (matriculaEl) {
-    if (!matriculaEl.value.trim()) { errEl.textContent = 'Ingresá tu número de matrícula.'; return; }
-    if (!val) { errEl.textContent = 'Ingresá el código de acceso.'; return; }
+    const matricula = matriculaEl.value.trim();
+    if (!matricula) { errEl.textContent = 'Ingresá tu número de matrícula.'; return; }
     const trackingUrl = (typeof TRACKING_SCRIPT_URL !== 'undefined') ? TRACKING_SCRIPT_URL : null;
     if (!trackingUrl) { errEl.textContent = 'Esta copia no tiene forma de validar el acceso.'; return; }
     errEl.textContent = 'Verificando...';
     try {
       const archivo = (typeof EXPORT_FILE_LABEL !== 'undefined') ? EXPORT_FILE_LABEL : 'export';
-      const res = await fetch(trackingUrl, { method: 'POST', body: JSON.stringify({ action: 'checkAccessAndLog', token: val, matricula: matriculaEl.value.trim(), archivo }) });
+      const res = await fetch(trackingUrl, { method: 'POST', body: JSON.stringify({ action: 'checkAccessAndLog', matricula, archivo }) });
       const data = await res.json();
       if (data.valid) {
-        localStorage.setItem(STORAGE_KEY, val);
-        unlock(val);
-      } else if (data.reason === 'matricula') {
-        errEl.textContent = 'Esa matrícula no está en el listado. Verificá el número.';
+        localStorage.setItem(STORAGE_KEY, matricula);
+        unlock(matricula);
       } else {
-        errEl.textContent = 'Código incorrecto.';
+        errEl.textContent = 'Esa matrícula no está en el listado. Verificá el número.';
       }
     } catch (err) {
       errEl.textContent = 'No pude verificar (revisá tu conexión) — ' + err.message;
     }
     return;
   }
+
+  const val = document.getElementById('lockInput').value.trim();
 
   // programa principal (sin campo de matrícula): validación normal de siempre
   if (scriptConfigured) {
