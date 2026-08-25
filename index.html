@@ -139,7 +139,7 @@
 </div>
 
 <header>
-  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.15</span></div>
+  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.16</span></div>
   <h1 id="pageTitle">Cartera y Cobranzas — Nacional</h1>
   <p id="headerSub">Evolución de cartera de socios, por gerencia divisional u oficina individual — más la situación actual de débito, mora y seguro.</p>
   <div class="tabs">
@@ -257,7 +257,7 @@
 
     <div class="upload-card">
       <label style="display:block;font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px;">📤 Exportar HTML para compartir</label>
-      <div class="hint" style="margin-bottom:10px;">Genera un archivo HTML de solo lectura con los datos de este momento para mandarle a cualquiera. Pide código de acceso y matrícula para entrar, y no se conecta a tu planilla real (salvo para anotar quién entró). El que lo recibe puede elegir gerencia y oficina igual que vos, pero no puede modificar ni actualizar nada.</div>
+      <div class="hint" style="margin-bottom:10px;">Genera un archivo HTML de solo lectura con los datos de este momento para mandarle a cualquiera. Pide número de matrícula (validado contra tu hoja "Matriculas") y código de acceso para entrar. No trae ni puede traer datos nuevos de tu planilla — solo consulta si la matrícula existe y anota quién entró. El que lo recibe puede elegir gerencia y oficina igual que vos, pero no puede modificar ni actualizar nada.</div>
       <div class="upload-row">
         <button class="btn-reset" id="btnExportStatic" style="background:var(--navy);color:white;">📤 Exportar todo</button>
         <button class="btn-reset" id="btnExportCobranzas" style="background:var(--navy-pale);color:var(--navy);">📤 Exportar solo Cobranzas</button>
@@ -278,7 +278,7 @@
 <footer>
   <span id="footerCartera">Evolución de cartera: cargando...</span>
   Cobranzas: se muestra el mes más nuevo guardado en tu planilla de Google Sheets, comparado contra el mes anterior guardado.
-  <br>Versión 1.15 — el candado de los archivos exportados ahora pide "Nombre y Apellido" en vez de matrícula (no se valida contra ninguna lista, es solo para identificarse en el registro).
+  <br>Versión 1.16 — los archivos exportados ahora piden número de matrícula y lo validan contra una lista real (hoja "Matriculas" en tu planilla) en vez de aceptar cualquier nombre escrito a mano.
 </footer>
 
 <script>
@@ -707,8 +707,8 @@ function exportStaticHtml(onlyCobranzas) {
       <div class="lock-card">
         <div class="lock-icon">🔒</div>
         <h2>Cartera y Cobranzas — ACA</h2>
-        <p>Ingresá tu nombre y apellido y el código de acceso que te compartió tu Gerencia Divisional.</p>
-        <input type="text" id="matriculaInput" placeholder="Tu nombre y apellido" autocomplete="off" style="margin-bottom:10px;">
+        <p>Ingresá tu número de matrícula y el código de acceso que te compartió tu Gerencia Divisional.</p>
+        <input type="text" id="matriculaInput" placeholder="Tu número de matrícula" autocomplete="off" style="margin-bottom:10px;" inputmode="numeric">
         <input type="password" id="lockInput" placeholder="Código de acceso" autocomplete="off">
         <button id="lockBtn">Entrar</button>
         <div class="lock-error" id="lockError"></div>
@@ -829,17 +829,19 @@ document.getElementById('btnLoadAccessLog')?.addEventListener('click', async () 
     // resumen por matrícula: cantidad de accesos y último acceso
     const porMatricula = {};
     log.forEach(r => {
-      const m = String(r['Nombre y Apellido'] || '(sin nombre)');
-      if (!porMatricula[m]) porMatricula[m] = { count: 0, ultima: null, archivos: new Set() };
-      porMatricula[m].count++;
-      porMatricula[m].archivos.add(r['Archivo'] || '');
+      const mat = String(r['Matrícula'] || '');
+      const nombre = String(r['Nombre y Apellido'] || '(sin nombre)');
+      const key = mat || nombre;
+      if (!porMatricula[key]) porMatricula[key] = { matricula: mat, nombre, count: 0, ultima: null, archivos: new Set() };
+      porMatricula[key].count++;
+      porMatricula[key].archivos.add(r['Archivo'] || '');
       const fecha = new Date(r['Fecha y hora']);
-      if (!porMatricula[m].ultima || fecha > porMatricula[m].ultima) porMatricula[m].ultima = fecha;
+      if (!porMatricula[key].ultima || fecha > porMatricula[key].ultima) porMatricula[key].ultima = fecha;
     });
-    const filas = Object.entries(porMatricula).sort((a,b) => b[1].count - a[1].count);
-    let html = '<table class="comp"><tr><th>Nombre y Apellido</th><th>Accesos</th><th>Último acceso</th><th>Archivo(s)</th></tr>';
-    filas.forEach(([m, info]) => {
-      html += `<tr><td>${m}</td><td>${info.count}</td><td>${info.ultima ? info.ultima.toLocaleString('es-AR') : '—'}</td><td>${[...info.archivos].join(', ')}</td></tr>`;
+    const filas = Object.values(porMatricula).sort((a,b) => b.count - a.count);
+    let html = '<table class="comp"><tr><th>Matrícula</th><th>Nombre y Apellido</th><th>Accesos</th><th>Último acceso</th><th>Archivo(s)</th></tr>';
+    filas.forEach(info => {
+      html += `<tr><td>${info.matricula || '—'}</td><td>${info.nombre}</td><td>${info.count}</td><td>${info.ultima ? info.ultima.toLocaleString('es-AR') : '—'}</td><td>${[...info.archivos].join(', ')}</td></tr>`;
     });
     html += '</table>';
     wrap.innerHTML = html;
@@ -1083,33 +1085,43 @@ async function tryUnlock() {
   errEl.textContent = '';
 
   const matriculaEl = document.getElementById('matriculaInput');
-  if (matriculaEl && !matriculaEl.value.trim()) {
-    errEl.textContent = 'Ingresá tu nombre y apellido.';
+
+  // archivos exportados: llevan campo de matrícula, y esa matrícula tiene que existir
+  // de verdad en tu planilla (hoja "Matriculas") además del código de acceso
+  if (matriculaEl) {
+    if (!matriculaEl.value.trim()) { errEl.textContent = 'Ingresá tu número de matrícula.'; return; }
+    if (!val) { errEl.textContent = 'Ingresá el código de acceso.'; return; }
+    const trackingUrl = (typeof TRACKING_SCRIPT_URL !== 'undefined') ? TRACKING_SCRIPT_URL : null;
+    if (!trackingUrl) { errEl.textContent = 'Esta copia no tiene forma de validar el acceso.'; return; }
+    errEl.textContent = 'Verificando...';
+    try {
+      const archivo = (typeof EXPORT_FILE_LABEL !== 'undefined') ? EXPORT_FILE_LABEL : 'export';
+      const res = await fetch(trackingUrl, { method: 'POST', body: JSON.stringify({ action: 'checkAccessAndLog', token: val, matricula: matriculaEl.value.trim(), archivo }) });
+      const data = await res.json();
+      if (data.valid) {
+        localStorage.setItem(STORAGE_KEY, val);
+        unlock(val);
+      } else if (data.reason === 'matricula') {
+        errEl.textContent = 'Esa matrícula no está en el listado. Verificá el número.';
+      } else {
+        errEl.textContent = 'Código incorrecto.';
+      }
+    } catch (err) {
+      errEl.textContent = 'No pude verificar (revisá tu conexión) — ' + err.message;
+    }
     return;
   }
 
-  function afterUnlock() {
-    if (matriculaEl) logAccessAttempt(matriculaEl.value.trim(), val);
-    unlock(val);
-  }
-
+  // programa principal (sin campo de matrícula): validación normal de siempre
   if (scriptConfigured) {
     errEl.textContent = 'Verificando...';
     const ok = await checkTokenRemote(val);
-    if (ok) { localStorage.setItem(STORAGE_KEY, val); afterUnlock(); }
+    if (ok) { localStorage.setItem(STORAGE_KEY, val); unlock(val); }
     else errEl.textContent = 'Código incorrecto.';
   } else {
-    if (val === FALLBACK_TOKEN) { localStorage.setItem(STORAGE_KEY, val); afterUnlock(); }
+    if (val === FALLBACK_TOKEN) { localStorage.setItem(STORAGE_KEY, val); unlock(val); }
     else errEl.textContent = 'Código incorrecto.';
   }
-}
-
-function logAccessAttempt(matricula, token) {
-  // solo existe este anzuelo en los archivos exportados (ver TRACKING_SCRIPT_URL); no bloquea el acceso si falla
-  const url = (typeof TRACKING_SCRIPT_URL !== 'undefined') ? TRACKING_SCRIPT_URL : null;
-  if (!url) return;
-  const archivo = (typeof EXPORT_FILE_LABEL !== 'undefined') ? EXPORT_FILE_LABEL : 'export';
-  fetch(url, { method: 'POST', body: JSON.stringify({ action: 'logAccess', token, matricula, archivo }) }).catch(() => {});
 }
 
 /* =================== Cargar TODO el histórico desde el Apps Script =================== */
