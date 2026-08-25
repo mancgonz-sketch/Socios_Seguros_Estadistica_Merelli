@@ -139,7 +139,7 @@
 </div>
 
 <header>
-  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.17</span></div>
+  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.18</span></div>
   <h1 id="pageTitle">Cartera y Cobranzas — Nacional</h1>
   <p id="headerSub">Evolución de cartera de socios, por gerencia divisional u oficina individual — más la situación actual de débito, mora y seguro.</p>
   <div class="tabs">
@@ -278,7 +278,7 @@
 <footer>
   <span id="footerCartera">Evolución de cartera: cargando...</span>
   Cobranzas: se muestra el mes más nuevo guardado en tu planilla de Google Sheets, comparado contra el mes anterior guardado.
-  <br>Versión 1.17 — el login del archivo exportado ahora es solo con matrícula (sin código aparte), y el registro guarda también dependencia y gerencia de cada persona.
+  <br>Versión 1.18 — los archivos exportados ya no reutilizan códigos guardados de sesiones anteriores; siempre piden la matrícula de nuevo, cada vez que se abren.
 </footer>
 
 <script>
@@ -1068,7 +1068,10 @@ async function checkTokenRemote(token) {
   return !!data.valid;
 }
 
-const savedToken = localStorage.getItem(STORAGE_KEY);
+// los archivos exportados (con campo de matrícula) siempre piden matrícula de nuevo,
+// no reutilizan nada guardado en el navegador de sesiones anteriores (evita que un código
+// viejo guardado de otra prueba deje pasar sin preguntar)
+const savedToken = document.getElementById('matriculaInput') ? null : localStorage.getItem(STORAGE_KEY);
 if (savedToken && !scriptConfigured && savedToken === FALLBACK_TOKEN) {
   unlock(savedToken);
 } else if (savedToken && scriptConfigured) {
