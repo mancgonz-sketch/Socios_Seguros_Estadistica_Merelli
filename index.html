@@ -139,7 +139,7 @@
 </div>
 
 <header>
-  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.16</span></div>
+  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.17</span></div>
   <h1 id="pageTitle">Cartera y Cobranzas — Nacional</h1>
   <p id="headerSub">Evolución de cartera de socios, por gerencia divisional u oficina individual — más la situación actual de débito, mora y seguro.</p>
   <div class="tabs">
@@ -257,7 +257,7 @@
 
     <div class="upload-card">
       <label style="display:block;font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px;">📤 Exportar HTML para compartir</label>
-      <div class="hint" style="margin-bottom:10px;">Genera un archivo HTML de solo lectura con los datos de este momento para mandarle a cualquiera. Pide número de matrícula (validado contra tu hoja "Matriculas") y código de acceso para entrar. No trae ni puede traer datos nuevos de tu planilla — solo consulta si la matrícula existe y anota quién entró. El que lo recibe puede elegir gerencia y oficina igual que vos, pero no puede modificar ni actualizar nada.</div>
+      <div class="hint" style="margin-bottom:10px;">Genera un archivo HTML de solo lectura con los datos de este momento para mandarle a cualquiera. Para entrar, solo pide el número de matrícula (validado contra tu hoja "Matriculas" — si no está en la lista, no entra). No trae ni puede traer datos nuevos de tu planilla — solo consulta si la matrícula existe y anota quién entró. El que lo recibe puede elegir gerencia y oficina igual que vos, pero no puede modificar ni actualizar nada.</div>
       <div class="upload-row">
         <button class="btn-reset" id="btnExportStatic" style="background:var(--navy);color:white;">📤 Exportar todo</button>
         <button class="btn-reset" id="btnExportCobranzas" style="background:var(--navy-pale);color:var(--navy);">📤 Exportar solo Cobranzas</button>
@@ -278,7 +278,7 @@
 <footer>
   <span id="footerCartera">Evolución de cartera: cargando...</span>
   Cobranzas: se muestra el mes más nuevo guardado en tu planilla de Google Sheets, comparado contra el mes anterior guardado.
-  <br>Versión 1.16 — los archivos exportados ahora piden número de matrícula y lo validan contra una lista real (hoja "Matriculas" en tu planilla) en vez de aceptar cualquier nombre escrito a mano.
+  <br>Versión 1.17 — el login del archivo exportado ahora es solo con matrícula (sin código aparte), y el registro guarda también dependencia y gerencia de cada persona.
 </footer>
 
 <script>
@@ -707,9 +707,8 @@ function exportStaticHtml(onlyCobranzas) {
       <div class="lock-card">
         <div class="lock-icon">🔒</div>
         <h2>Cartera y Cobranzas — ACA</h2>
-        <p>Ingresá tu número de matrícula y el código de acceso que te compartió tu Gerencia Divisional.</p>
-        <input type="text" id="matriculaInput" placeholder="Tu número de matrícula" autocomplete="off" style="margin-bottom:10px;" inputmode="numeric">
-        <input type="password" id="lockInput" placeholder="Código de acceso" autocomplete="off">
+        <p>Ingresá tu número de matrícula para entrar.</p>
+        <input type="text" id="matriculaInput" placeholder="Tu número de matrícula" autocomplete="off" inputmode="numeric">
         <button id="lockBtn">Entrar</button>
         <div class="lock-error" id="lockError"></div>
       </div>`;
@@ -832,16 +831,16 @@ document.getElementById('btnLoadAccessLog')?.addEventListener('click', async () 
       const mat = String(r['Matrícula'] || '');
       const nombre = String(r['Nombre y Apellido'] || '(sin nombre)');
       const key = mat || nombre;
-      if (!porMatricula[key]) porMatricula[key] = { matricula: mat, nombre, count: 0, ultima: null, archivos: new Set() };
+      if (!porMatricula[key]) porMatricula[key] = { matricula: mat, nombre, dependencia: r['Dependencia'] || '', gerencia: r['Gerencia'] || '', count: 0, ultima: null, archivos: new Set() };
       porMatricula[key].count++;
       porMatricula[key].archivos.add(r['Archivo'] || '');
       const fecha = new Date(r['Fecha y hora']);
       if (!porMatricula[key].ultima || fecha > porMatricula[key].ultima) porMatricula[key].ultima = fecha;
     });
     const filas = Object.values(porMatricula).sort((a,b) => b.count - a.count);
-    let html = '<table class="comp"><tr><th>Matrícula</th><th>Nombre y Apellido</th><th>Accesos</th><th>Último acceso</th><th>Archivo(s)</th></tr>';
+    let html = '<table class="comp"><tr><th>Matrícula</th><th>Nombre y Apellido</th><th>Dependencia</th><th>Gerencia</th><th>Accesos</th><th>Último acceso</th><th>Archivo(s)</th></tr>';
     filas.forEach(info => {
-      html += `<tr><td>${info.matricula || '—'}</td><td>${info.nombre}</td><td>${info.count}</td><td>${info.ultima ? info.ultima.toLocaleString('es-AR') : '—'}</td><td>${[...info.archivos].join(', ')}</td></tr>`;
+      html += `<tr><td>${info.matricula || '—'}</td><td>${info.nombre}</td><td>${info.dependencia || '—'}</td><td>${info.gerencia || '—'}</td><td>${info.count}</td><td>${info.ultima ? info.ultima.toLocaleString('es-AR') : '—'}</td><td>${[...info.archivos].join(', ')}</td></tr>`;
     });
     html += '</table>';
     wrap.innerHTML = html;
@@ -1077,40 +1076,39 @@ if (savedToken && !scriptConfigured && savedToken === FALLBACK_TOKEN) {
 }
 
 document.getElementById('lockBtn').addEventListener('click', tryUnlock);
-document.getElementById('lockInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+document.getElementById('lockInput')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
+document.getElementById('matriculaInput')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryUnlock(); });
 
 async function tryUnlock() {
-  const val = document.getElementById('lockInput').value.trim();
   const errEl = document.getElementById('lockError');
   errEl.textContent = '';
 
   const matriculaEl = document.getElementById('matriculaInput');
 
-  // archivos exportados: llevan campo de matrícula, y esa matrícula tiene que existir
-  // de verdad en tu planilla (hoja "Matriculas") además del código de acceso
+  // archivos exportados: solo piden matrícula, validada contra tu planilla (hoja "Matriculas")
   if (matriculaEl) {
-    if (!matriculaEl.value.trim()) { errEl.textContent = 'Ingresá tu número de matrícula.'; return; }
-    if (!val) { errEl.textContent = 'Ingresá el código de acceso.'; return; }
+    const matricula = matriculaEl.value.trim();
+    if (!matricula) { errEl.textContent = 'Ingresá tu número de matrícula.'; return; }
     const trackingUrl = (typeof TRACKING_SCRIPT_URL !== 'undefined') ? TRACKING_SCRIPT_URL : null;
     if (!trackingUrl) { errEl.textContent = 'Esta copia no tiene forma de validar el acceso.'; return; }
     errEl.textContent = 'Verificando...';
     try {
       const archivo = (typeof EXPORT_FILE_LABEL !== 'undefined') ? EXPORT_FILE_LABEL : 'export';
-      const res = await fetch(trackingUrl, { method: 'POST', body: JSON.stringify({ action: 'checkAccessAndLog', token: val, matricula: matriculaEl.value.trim(), archivo }) });
+      const res = await fetch(trackingUrl, { method: 'POST', body: JSON.stringify({ action: 'checkAccessAndLog', matricula, archivo }) });
       const data = await res.json();
       if (data.valid) {
-        localStorage.setItem(STORAGE_KEY, val);
-        unlock(val);
-      } else if (data.reason === 'matricula') {
-        errEl.textContent = 'Esa matrícula no está en el listado. Verificá el número.';
+        localStorage.setItem(STORAGE_KEY, matricula);
+        unlock(matricula);
       } else {
-        errEl.textContent = 'Código incorrecto.';
+        errEl.textContent = 'Esa matrícula no está en el listado. Verificá el número.';
       }
     } catch (err) {
       errEl.textContent = 'No pude verificar (revisá tu conexión) — ' + err.message;
     }
     return;
   }
+
+  const val = document.getElementById('lockInput').value.trim();
 
   // programa principal (sin campo de matrícula): validación normal de siempre
   if (scriptConfigured) {
