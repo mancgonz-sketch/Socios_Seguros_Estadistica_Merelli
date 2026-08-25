@@ -139,7 +139,7 @@
 </div>
 
 <header>
-  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.9</span></div>
+  <div class="eyebrow">ACA · Producción de Socios y Seguros <span id="versionBadge" style="opacity:.7;font-weight:600;">· v1.15</span></div>
   <h1 id="pageTitle">Cartera y Cobranzas — Nacional</h1>
   <p id="headerSub">Evolución de cartera de socios, por gerencia divisional u oficina individual — más la situación actual de débito, mora y seguro.</p>
   <div class="tabs">
@@ -257,12 +257,20 @@
 
     <div class="upload-card">
       <label style="display:block;font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px;">📤 Exportar HTML para compartir</label>
-      <div class="hint" style="margin-bottom:10px;">Genera un archivo HTML de solo lectura con los datos de este momento — sin conexión a tu planilla ni candado — para mandarle a cualquiera. El que lo recibe puede elegir gerencia y oficina igual que vos, pero no puede modificar ni actualizar nada.</div>
+      <div class="hint" style="margin-bottom:10px;">Genera un archivo HTML de solo lectura con los datos de este momento para mandarle a cualquiera. Pide código de acceso y matrícula para entrar, y no se conecta a tu planilla real (salvo para anotar quién entró). El que lo recibe puede elegir gerencia y oficina igual que vos, pero no puede modificar ni actualizar nada.</div>
       <div class="upload-row">
         <button class="btn-reset" id="btnExportStatic" style="background:var(--navy);color:white;">📤 Exportar todo</button>
         <button class="btn-reset" id="btnExportCobranzas" style="background:var(--navy-pale);color:var(--navy);">📤 Exportar solo Cobranzas</button>
       </div>
       <div id="exportStatus" style="font-size:11.5px;margin-top:10px;"></div>
+    </div>
+
+    <div class="upload-card">
+      <label style="display:block;font-size:12px;font-weight:700;color:var(--navy);margin-bottom:6px;">📋 Registro de accesos a los archivos exportados</label>
+      <div class="hint" style="margin-bottom:10px;">Quién entró, cuándo, y a qué archivo — cada vez que alguien pone su matrícula y el código en un archivo exportado, queda anotado acá.</div>
+      <button class="btn-reset" id="btnLoadAccessLog" style="background:var(--navy);color:white;">Cargar registro</button>
+      <div id="accessLogStatus" style="font-size:11.5px;margin-top:10px;"></div>
+      <div id="accessLogWrap" style="margin-top:12px;"></div>
     </div>
   </div>
 </main>
@@ -270,7 +278,7 @@
 <footer>
   <span id="footerCartera">Evolución de cartera: cargando...</span>
   Cobranzas: se muestra el mes más nuevo guardado en tu planilla de Google Sheets, comparado contra el mes anterior guardado.
-  <br>Versión 1.9 — corrige duplicación de opciones (gerencias/oficinas) cuando el HTML exportado se abre y el script corre de nuevo sobre contenido ya generado.
+  <br>Versión 1.15 — el candado de los archivos exportados ahora pide "Nombre y Apellido" en vez de matrícula (no se valida contra ninguna lista, es solo para identificarse en el registro).
 </footer>
 
 <script>
@@ -658,7 +666,7 @@ function loadDefault() {
   document.getElementById('uploadStatus').className = 'upload-status';
 }
 
-document.getElementById('btnReset').addEventListener('click', () => {
+document.getElementById('btnReset')?.addEventListener('click', () => {
   document.getElementById('fileCurrent').value = '';
   document.getElementById('filePrev').value = '';
   loadFromAppsScript();
@@ -691,6 +699,26 @@ function exportStaticHtml(onlyCobranzas) {
       clone.querySelector('#panel-carga')?.remove();
     }
 
+    // volver a poner el candado en la copia exportada (en la página en vivo ya se sacó al desbloquear)
+    clone.querySelector('body').classList.add('locked');
+    const lockDiv = document.createElement('div');
+    lockDiv.id = 'lockScreen';
+    lockDiv.innerHTML = `
+      <div class="lock-card">
+        <div class="lock-icon">🔒</div>
+        <h2>Cartera y Cobranzas — ACA</h2>
+        <p>Ingresá tu nombre y apellido y el código de acceso que te compartió tu Gerencia Divisional.</p>
+        <input type="text" id="matriculaInput" placeholder="Tu nombre y apellido" autocomplete="off" style="margin-bottom:10px;">
+        <input type="password" id="lockInput" placeholder="Código de acceso" autocomplete="off">
+        <button id="lockBtn">Entrar</button>
+        <div class="lock-error" id="lockError"></div>
+      </div>`;
+    clone.querySelector('body').prepend(lockDiv);
+    // solo en la copia exportada: se usa nada más que para anotar "fulano entró" — no se puede leer ni pedir datos con esto
+    const trackingScriptTag = clone.ownerDocument.createElement('script');
+    trackingScriptTag.textContent = 'const TRACKING_SCRIPT_URL = ' + JSON.stringify(APPS_SCRIPT_URL) + '; const EXPORT_FILE_LABEL = ' + JSON.stringify(onlyCobranzas ? 'situacion_cobranzas' : 'cartera_cobranzas') + ';';
+    clone.querySelector('head').appendChild(trackingScriptTag);
+
     let html = '<!DOCTYPE html>\n' + clone.outerHTML;
     const escapeForJs = (obj) => JSON.stringify(obj).replace(/</g, '\u003c');
 
@@ -700,12 +728,12 @@ function exportStaticHtml(onlyCobranzas) {
     // (lastOficinas/lastComparativa ya son el listado completo sin filtrar; el filtro de la pantalla es solo visual)
     html = html.replace('let COBRANZAS_DEFAULT = [];', 'let COBRANZAS_DEFAULT = ' + escapeForJs(lastOficinas) + ';');
     html = html.replace('let COMPARATIVA_DEFAULT = [];', 'let COMPARATIVA_DEFAULT = ' + escapeForJs(lastComparativa) + ';');
-    html = html.replace(/const APPS_SCRIPT_URL = '[^']*';/, "const APPS_SCRIPT_URL = '';");
+    html = html.replace(/const APPS_SCRIPT_URL = 'https:\/\/[^']*';/, "const APPS_SCRIPT_URL = '';");
     html = html.replace(/<\/script>\s*<\/body>/, `
 rebuildOfficesByDiv();
-${onlyCobranzas ? '' : "populateOficinaPicker(currentDiv); renderCartera();"}
 renderComparativa(COMPARATIVA_DEFAULT);
 renderOficinas(COBRANZAS_DEFAULT);
+${onlyCobranzas ? '' : "try { populateOficinaPicker(currentDiv); renderCartera(); } catch (e) { console.error('Evolución de Cartera no se pudo dibujar:', e); }"}
 <\/script>
 <\/body>`);
     html = html.replace('<title>Cartera y Cobranzas — ACA Nacional</title>', '<title>' + (onlyCobranzas ? 'Situación de Cobranzas — ACA' : 'Cartera y Cobranzas — ACA Nacional') + ' (foto estática)</title>');
@@ -730,8 +758,8 @@ renderOficinas(COBRANZAS_DEFAULT);
   }
 }
 
-document.getElementById('btnExportStatic').addEventListener('click', () => exportStaticHtml(false));
-document.getElementById('btnExportCobranzas').addEventListener('click', () => exportStaticHtml(true));
+document.getElementById('btnExportStatic')?.addEventListener('click', () => exportStaticHtml(false));
+document.getElementById('btnExportCobranzas')?.addEventListener('click', () => exportStaticHtml(true));
 
 /* ---- Datos de muestra (ficticios), para demostrar la herramienta sin usar el archivo real ---- */
 function buildSampleData() {
@@ -777,7 +805,53 @@ function buildSampleData() {
   return { comparativa, groups };
 }
 
-document.getElementById('btnSample').addEventListener('click', () => {
+/* ---- Registro de accesos a los archivos exportados ---- */
+document.getElementById('btnLoadAccessLog')?.addEventListener('click', async () => {
+  const statusEl = document.getElementById('accessLogStatus');
+  const wrap = document.getElementById('accessLogWrap');
+  if (!scriptConfigured) {
+    statusEl.textContent = 'Necesita que conectes el Apps Script primero.';
+    statusEl.className = 'upload-status err';
+    return;
+  }
+  statusEl.textContent = 'Cargando...'; statusEl.className = 'upload-status';
+  try {
+    const res = await fetch(APPS_SCRIPT_URL + '?action=getAccessLog&token=' + encodeURIComponent(sessionToken));
+    const data = await res.json();
+    if (data.error) { statusEl.textContent = 'Error: ' + data.error; statusEl.className = 'upload-status err'; return; }
+    const log = data.log || [];
+    if (log.length === 0) {
+      statusEl.textContent = 'Todavía no hay ningún acceso registrado.';
+      statusEl.className = 'upload-status';
+      wrap.innerHTML = '';
+      return;
+    }
+    // resumen por matrícula: cantidad de accesos y último acceso
+    const porMatricula = {};
+    log.forEach(r => {
+      const m = String(r['Nombre y Apellido'] || '(sin nombre)');
+      if (!porMatricula[m]) porMatricula[m] = { count: 0, ultima: null, archivos: new Set() };
+      porMatricula[m].count++;
+      porMatricula[m].archivos.add(r['Archivo'] || '');
+      const fecha = new Date(r['Fecha y hora']);
+      if (!porMatricula[m].ultima || fecha > porMatricula[m].ultima) porMatricula[m].ultima = fecha;
+    });
+    const filas = Object.entries(porMatricula).sort((a,b) => b[1].count - a[1].count);
+    let html = '<table class="comp"><tr><th>Nombre y Apellido</th><th>Accesos</th><th>Último acceso</th><th>Archivo(s)</th></tr>';
+    filas.forEach(([m, info]) => {
+      html += `<tr><td>${m}</td><td>${info.count}</td><td>${info.ultima ? info.ultima.toLocaleString('es-AR') : '—'}</td><td>${[...info.archivos].join(', ')}</td></tr>`;
+    });
+    html += '</table>';
+    wrap.innerHTML = html;
+    statusEl.textContent = `${log.length} acceso(s) registrados, ${filas.length} matrícula(s) distintas.`;
+    statusEl.className = 'upload-status ok';
+  } catch (err) {
+    statusEl.textContent = 'No pude conectar: ' + err.message;
+    statusEl.className = 'upload-status err';
+  }
+});
+
+document.getElementById('btnSample')?.addEventListener('click', () => {
   document.getElementById('fileCurrent').value = '';
   document.getElementById('filePrev').value = '';
   const sample = buildSampleData();
@@ -924,7 +998,7 @@ function buildOficinasFromParsed(current, prevOffices) {
 
 let prevOfficesData = null;
 
-document.getElementById('filePrev').addEventListener('change', async (e) => {
+document.getElementById('filePrev')?.addEventListener('change', async (e) => {
   const f = e.target.files[0];
   if (!f) { prevOfficesData = null; return; }
   try {
@@ -938,7 +1012,7 @@ document.getElementById('filePrev').addEventListener('change', async (e) => {
   }
 });
 
-document.getElementById('fileCurrent').addEventListener('change', async (e) => {
+document.getElementById('fileCurrent')?.addEventListener('change', async (e) => {
   const f = e.target.files[0];
   if (!f) return;
   const statusEl = document.getElementById('uploadStatus');
@@ -975,12 +1049,16 @@ let sessionToken = null;
 function unlock(token) {
   sessionToken = token;
   document.body.classList.remove('locked');
-  document.getElementById('lockScreen').remove();
-  document.getElementById('btnSaveToSheet').disabled = !scriptConfigured;
-  document.getElementById('saveToSheetHint').textContent = scriptConfigured
-    ? 'Conectado a tu planilla de Google Sheets. Cada mes que guardes acá crea (o reemplaza) una hoja "Datos_<mes>" ahí.'
-    : 'Para guardar en Google Sheets, primero conectá el Apps Script (ver Code.gs).';
-  loadFromAppsScript();
+  document.getElementById('lockScreen')?.remove();
+  const saveBtn = document.getElementById('btnSaveToSheet');
+  if (saveBtn) saveBtn.disabled = !scriptConfigured;
+  const saveHint = document.getElementById('saveToSheetHint');
+  if (saveHint) {
+    saveHint.textContent = scriptConfigured
+      ? 'Conectado a tu planilla de Google Sheets. Cada mes que guardes acá crea (o reemplaza) una hoja "Datos_<mes>" ahí.'
+      : 'Para guardar en Google Sheets, primero conectá el Apps Script (ver Code.gs).';
+  }
+  if (scriptConfigured) loadFromAppsScript();
 }
 
 async function checkTokenRemote(token) {
@@ -1003,15 +1081,35 @@ async function tryUnlock() {
   const val = document.getElementById('lockInput').value.trim();
   const errEl = document.getElementById('lockError');
   errEl.textContent = '';
+
+  const matriculaEl = document.getElementById('matriculaInput');
+  if (matriculaEl && !matriculaEl.value.trim()) {
+    errEl.textContent = 'Ingresá tu nombre y apellido.';
+    return;
+  }
+
+  function afterUnlock() {
+    if (matriculaEl) logAccessAttempt(matriculaEl.value.trim(), val);
+    unlock(val);
+  }
+
   if (scriptConfigured) {
     errEl.textContent = 'Verificando...';
     const ok = await checkTokenRemote(val);
-    if (ok) { localStorage.setItem(STORAGE_KEY, val); unlock(val); }
+    if (ok) { localStorage.setItem(STORAGE_KEY, val); afterUnlock(); }
     else errEl.textContent = 'Código incorrecto.';
   } else {
-    if (val === FALLBACK_TOKEN) { localStorage.setItem(STORAGE_KEY, val); unlock(val); }
+    if (val === FALLBACK_TOKEN) { localStorage.setItem(STORAGE_KEY, val); afterUnlock(); }
     else errEl.textContent = 'Código incorrecto.';
   }
+}
+
+function logAccessAttempt(matricula, token) {
+  // solo existe este anzuelo en los archivos exportados (ver TRACKING_SCRIPT_URL); no bloquea el acceso si falla
+  const url = (typeof TRACKING_SCRIPT_URL !== 'undefined') ? TRACKING_SCRIPT_URL : null;
+  if (!url) return;
+  const archivo = (typeof EXPORT_FILE_LABEL !== 'undefined') ? EXPORT_FILE_LABEL : 'export';
+  fetch(url, { method: 'POST', body: JSON.stringify({ action: 'logAccess', token, matricula, archivo }) }).catch(() => {});
 }
 
 /* =================== Cargar TODO el histórico desde el Apps Script =================== */
@@ -1164,7 +1262,7 @@ function applyFetchedData(raw) {
 /* =================== Guardar mes en Google Sheets =================== */
 let lastParsedForSheet = null; // { offices: {...}, divTotals: {...} } del último archivo subido
 
-document.getElementById('btnSaveToSheet').addEventListener('click', async () => {
+document.getElementById('btnSaveToSheet')?.addEventListener('click', async () => {
   const statusEl = document.getElementById('saveToSheetStatus');
   if (!scriptConfigured) { statusEl.textContent = 'Apps Script no configurado todavía.'; statusEl.className='upload-status err'; return; }
   if (!lastParsedForSheet) { statusEl.textContent = 'Primero subí un archivo del mes actual arriba.'; statusEl.className='upload-status err'; return; }
